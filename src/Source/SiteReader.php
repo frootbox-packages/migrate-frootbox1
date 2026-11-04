@@ -178,6 +178,7 @@ final readonly class SiteReader
                 Row::string($row, 'title'),
                 Row::string($row, 'className'),
                 Row::json($row, 'config'),
+                Row::int($row, 'visibility') > 0,
             );
         }
 

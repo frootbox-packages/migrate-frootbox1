@@ -19,6 +19,7 @@ final readonly class NavigationItem
         public string $title,
         public string $className,
         public array $config,
+        public bool $visible = true,
     ) {}
 
     /**

@@ -27,7 +27,7 @@ final class OldSite
         'content_widgets' => 'id INTEGER PRIMARY KEY, className TEXT, config TEXT, textUid TEXT',
         'aliases' => 'id INTEGER PRIMARY KEY, alias TEXT, itemId INT, itemModel TEXT, language TEXT, status INT, config TEXT',
         'navigations' => 'id INTEGER PRIMARY KEY, navId TEXT, title TEXT',
-        'navigations_items' => 'id INTEGER PRIMARY KEY, navId INT, parentId INT, orderId INT, title TEXT, className TEXT, config TEXT',
+        'navigations_items' => 'id INTEGER PRIMARY KEY, navId INT, parentId INT, orderId INT, title TEXT, className TEXT, config TEXT, visibility INT',
     ];
 
     private const string BLOCKS = 'Frootbox-Persistence-Content-Blocks-Repositories-Blocks';
@@ -70,7 +70,8 @@ final class OldSite
         $connection->insert('aliases', ['alias' => 'about', 'itemId' => 2, 'itemModel' => 'Frootbox\Persistence\Repositories\Pages', 'language' => 'de-DE', 'status' => 301, 'config' => '{"target":"ueber-uns"}']);
 
         $connection->insert('navigations', ['id' => 1, 'navId' => 'Main', 'title' => 'Hauptnavigation']);
-        $connection->insert('navigations_items', ['id' => 1, 'navId' => 1, 'parentId' => 0, 'title' => 'Über uns', 'className' => 'Frootbox\Ext\Core\Navigation\Navigations\Items\Page\Item', 'config' => '{"pageId":"2"}']);
+        $connection->insert('navigations_items', ['id' => 1, 'navId' => 1, 'parentId' => 0, 'title' => 'Über uns', 'className' => 'Frootbox\Ext\Core\Navigation\Navigations\Items\Page\Item', 'config' => '{"pageId":"2"}', 'visibility' => 2]);
+        $connection->insert('navigations_items', ['id' => 2, 'navId' => 1, 'parentId' => 0, 'title' => 'Versteckt', 'className' => 'Frootbox\Ext\Core\Navigation\Navigations\Items\Page\Item', 'config' => '{"pageId":"1"}', 'visibility' => 0]);
 
         return $connection;
     }

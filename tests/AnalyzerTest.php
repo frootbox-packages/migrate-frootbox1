@@ -51,6 +51,7 @@ final class AnalyzerTest extends TestCase
         self::assertSame('© Jane', $site->widgets[1]->content->file('image')?->copyright);
         self::assertTrue($site->aliases[1]->isRedirect());
         self::assertSame('Page', $site->navigations[0]->items[0]->type());
+        self::assertSame([true, false], array_map(static fn($item): bool => $item->visible, $site->navigations[0]->items));
     }
 
     public function testFindsWhatNeedsAHand(): void
