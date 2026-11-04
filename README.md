@@ -92,3 +92,9 @@ Each page takes over its description for search engines (the one of its
 address wins, as in Frootbox 1, cut to 300 characters) and whether search
 engines or the site search leave it out. Frootbox 2 has no title of its
 own for search engines yet, so such a title goes into the report.
+
+## Source and issues
+
+This package is developed in the [Frootbox monorepo](https://github.com/Frootbox/frootbox)
+and mirrored here read-only. Questions, bugs and ideas go there, see the
+[documentation](https://github.com/Frootbox/frootbox/tree/main/documentation).
