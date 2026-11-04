@@ -774,20 +774,23 @@ final class Importer
                 $this->note(\sprintf('%s: the file %s is missing in %s.', $this->where, $file->name, $source));
             }
 
+            // The mapping fills in what the file lacks in Frootbox 1.
+            $alt = '' === $file->title ? $this->mapping->media[$file->name]['alt'] ?? '' : $file->title;
+            $copyright = '' === $file->copyright ? $this->mapping->media[$file->name]['copyright'] ?? '' : $file->copyright;
             $this->files[$target] = $source;
             $this->media[] = ['upload' => ['file' => $target], 'as' => 'u' . $file->id];
             $this->media[] = [
                 'media.create' => array_filter([
                     'upload' => '${u' . $file->id . '.token}',
-                    'copyright' => '' === $file->copyright ? null : $file->copyright,
-                    'texts' => '' === $file->title ? null : [$this->code => ['alt' => $file->title]],
+                    'copyright' => '' === $copyright ? null : $copyright,
+                    'texts' => '' === $alt ? null : [$this->code => ['alt' => $alt]],
                 ], static fn(mixed $value): bool => null !== $value),
                 'as' => $name,
             ];
             $this->mediaNames[$file->id] = $name;
 
-            if ('' === $file->title) {
-                $this->note(\sprintf('The image %s has no description (alt text) yet.', $file->name));
+            if ('' === $alt) {
+                $this->note(\sprintf('The image %s has no description (alt text) yet; the mapping can give it one under media.', $file->name));
             }
         }
 

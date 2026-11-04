@@ -51,17 +51,22 @@ blocks:
 plugins:
   Core/Navigation/Teaser@Index06: { block: acme/theme/Stage, fields: { items.1.background: image } }
   Core/ContactForms/FormTeaser@Index01: { block: frootbox/forms/Form, form: true }
+  Core/FileManager/CopyrightFilesList@Index01: { block: frootbox/theme-base/ImageCredits }
 items:
   Teaser: { fields: { title: title, text: text, link: { to: link, text: More } } }
 navigations: { BannerMain: main }
 site:
   fields: { brand: Example, contact: { target: '{page:5}', text: Contact } }
+media:                              # by the file name in Frootbox 1
+  team.jpg: { alt: 'The team in front of the practice', copyright: 'Jane Doe' }
 ```
 
 `{page:5}` is the new page of page 5 in Frootbox 1, `{config.x}` a value
 in the configuration of the old block. Each value is converted by the type
 of the target field: HTML becomes rich text, links to old pages and
 aliases become links to the new pages, files become media.
+Under `media` the mapping fills in an alt text or a copyright that a file
+lacks in Frootbox 1.
 
 ## Import
 

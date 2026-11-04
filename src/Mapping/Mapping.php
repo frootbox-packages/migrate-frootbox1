@@ -40,6 +40,8 @@ use Symfony\Component\Yaml\Yaml;
  *     navigations: { BannerMain: main }
  *     site:
  *       fields: { brand: Example, contact: { target: '{page:5}', text: Contact } }
+ *     media:                              # by the file name in Frootbox 1
+ *       team.jpg: { alt: 'The team in front of the practice', copyright: 'Jane Doe' }
  *
  * "{page:5}" stands for the new page of page 5 in Frootbox 1, "{config.x}"
  * for a value in the configuration of the block or plugin.
@@ -55,6 +57,7 @@ final readonly class Mapping
      * @param array<string, Rule>        $items
      * @param array<string, string|null> $navigations
      * @param array<string, mixed>       $site        Fields of the website
+     * @param array<string, array{alt?: string, copyright?: string}> $media Texts of files by their name in Frootbox 1, where they lack them
      */
     public function __construct(
         public array $languages,
@@ -65,6 +68,7 @@ final readonly class Mapping
         public array $items,
         public array $navigations,
         public array $site,
+        public array $media = [],
     ) {}
 
     /**
@@ -136,7 +140,16 @@ final readonly class Mapping
 
         $domains = array_values(array_filter(\is_array($data['domains'] ?? null) ? $data['domains'] : [], is_string(...)));
 
-        return new self($languages, $domains, $layouts, $blocks, $plugins, $items, $navigations, Row::map(Row::map($data['site'] ?? [])['fields'] ?? []));
+        $media = [];
+
+        foreach (Row::map($data['media'] ?? []) as $name => $texts) {
+            $media[$name] = array_filter(
+                array_intersect_key(array_map(static fn(mixed $text): string => \is_string($text) ? trim($text) : '', Row::map($texts)), ['alt' => true, 'copyright' => true]),
+                static fn(string $text): bool => '' !== $text,
+            );
+        }
+
+        return new self($languages, $domains, $layouts, $blocks, $plugins, $items, $navigations, Row::map(Row::map($data['site'] ?? [])['fields'] ?? []), $media);
     }
 
     /**

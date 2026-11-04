@@ -128,7 +128,7 @@ final class ImporterTest extends TestCase
         $plan = $this->plan();
 
         self::assertSame([
-            'The image team.jpg has no description (alt text) yet.',
+            'The image team.jpg has no description (alt text) yet; the mapping can give it one under media.',
             'Block 3 (Text) on page 2 "Über uns": a widget 7 in the text is left out.',
             'Page 2 "Über uns" has its own title for search engines, "Wer wir sind"; Frootbox 2 has no field for it yet.',
             'Navigation "Main": the entry "Versteckt" is hidden and left out.',
@@ -136,6 +136,14 @@ final class ImporterTest extends TestCase
         ], $plan->report);
         self::assertStringContainsString("- Navigation \"Main\": the entry \"Versteckt\" is hidden and left out.\n", $plan->markdown());
         self::assertStringStartsWith('# The website from Frootbox 1 (old), written by fb1:import.', $plan->yaml('old'));
+    }
+
+    public function testTheMappingFillsInWhatAFileLacks(): void
+    {
+        $plan = $this->plan(media: ['team.jpg' => ['alt' => 'Das Team vor der Praxis', 'copyright' => 'Max Muster']]);
+
+        self::assertSame(['upload' => '${u1.token}', 'copyright' => '© Jane', 'texts' => ['de' => ['alt' => 'Das Team vor der Praxis']]], $plan->steps[1]['media.create'], 'The copyright of Frootbox 1 wins, the alt text comes from the mapping.');
+        self::assertNotContains('The image team.jpg has no description (alt text) yet; the mapping can give it one under media.', $plan->report);
     }
 
     public function testRejectsAMappingThatIsNotFilledIn(): void
@@ -146,7 +154,10 @@ final class ImporterTest extends TestCase
         Mapping::fromArray(['languages' => ['de-DE' => 'de'], 'blocks' => ['Text' => null]]);
     }
 
-    private function plan(bool $publish = false): Plan
+    /**
+     * @param array<string, array<string, string>> $media
+     */
+    private function plan(bool $publish = false, array $media = []): Plan
     {
         $text = self::block('acme/site/Text', [
             'title' => new Field('title', 'headline', 'Title', optional: true),
@@ -176,6 +187,7 @@ final class ImporterTest extends TestCase
             'items' => ['Teaser' => ['fields' => ['title' => 'title', 'link' => ['to' => 'link', 'text' => 'Mehr'], 'background' => false]]],
             'navigations' => ['Main' => 'main'],
             'site' => ['fields' => ['brand' => 'Acme', 'contact' => ['target' => '{page:2}', 'text' => 'Kontakt']]],
+            'media' => $media,
         ]);
 
         return new Importer(new SiteReader(OldSite::create())->read(), $mapping, $components, $this->files)->plan($publish);
