@@ -200,13 +200,16 @@ final readonly class SiteReader
 
         foreach ($this->rows('SELECT * FROM aliases ORDER BY id') as $row) {
             $parts = explode('\\', Row::string($row, 'itemModel'));
+            $config = Row::json($row, 'config');
             $aliases[] = new Alias(
                 trim(Row::string($row, 'alias'), '/'),
                 Row::int($row, 'itemId'),
                 end($parts),
                 Row::string($row, 'language'),
                 Row::int($row, 'status'),
-                Row::pathString(Row::json($row, 'config'), 'target'),
+                Row::pathString($config, 'target'),
+                Row::pathString($config, 'seo', 'title'),
+                Row::pathString($config, 'seo', 'description'),
             );
         }
 

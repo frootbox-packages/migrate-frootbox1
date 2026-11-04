@@ -42,7 +42,7 @@ final class OldSite
 
         $page = 'Frootbox-Persistence-Repositories-Pages';
         $connection->insert('pages', ['id' => 1, 'parentId' => 0, 'lft' => 1, 'rgt' => 6, 'language' => 'de-DE', 'title' => 'Start', 'alias' => '', 'visibility' => 'Public', 'type' => 'Default']);
-        $connection->insert('pages', ['id' => 2, 'parentId' => 1, 'lft' => 2, 'rgt' => 3, 'language' => 'de-DE', 'title' => 'Über uns', 'alias' => 'ueber-uns', 'config' => '{"view":null}', 'visibility' => 'Public', 'type' => 'Default']);
+        $connection->insert('pages', ['id' => 2, 'parentId' => 1, 'lft' => 2, 'rgt' => 3, 'language' => 'de-DE', 'title' => 'Über uns', 'alias' => 'ueber-uns', 'config' => '{"view":null,"seo":{"title":"Wer wir sind","description":"Alt.","preventIndexing":null},"search":{"preventIndexing":"1"}}', 'visibility' => 'Public', 'type' => 'Default']);
         $connection->insert('pages', ['id' => 3, 'parentId' => 1, 'lft' => 4, 'rgt' => 5, 'language' => 'de-DE', 'title' => 'Alt', 'alias' => 'alt', 'config' => '{"pageType":"Redirect","redirect":{"target":"fbx:\/\/page:9"}}', 'visibility' => 'Public', 'type' => 'Redirect']);
 
         // Two blocks on the start page: the one with the higher orderId comes first.
@@ -66,7 +66,7 @@ final class OldSite
 
         $connection->insert('content_elements', ['id' => 1, 'pageId' => 1, 'socket' => 'Emotional', 'orderId' => 1, 'className' => 'Frootbox\Ext\Core\Navigation\Plugins\Teaser\Plugin', 'title' => 'Teaser', 'config' => '{"layout":{"index":"Index06"},"variables":{"index":{"crossFade":"on"}}}', 'visibility' => 2]);
 
-        $connection->insert('aliases', ['alias' => 'ueber-uns', 'itemId' => 2, 'itemModel' => 'Frootbox\Persistence\Repositories\Pages', 'language' => 'de-DE', 'status' => 200, 'config' => '[]']);
+        $connection->insert('aliases', ['alias' => 'ueber-uns', 'itemId' => 2, 'itemModel' => 'Frootbox\Persistence\Repositories\Pages', 'language' => 'de-DE', 'status' => 200, 'config' => '{"seo":{"description":"Wer wir sind  und <b>was</b> wir tun."}}']);
         $connection->insert('aliases', ['alias' => 'about', 'itemId' => 2, 'itemModel' => 'Frootbox\Persistence\Repositories\Pages', 'language' => 'de-DE', 'status' => 301, 'config' => '{"target":"ueber-uns"}']);
 
         $connection->insert('navigations', ['id' => 1, 'navId' => 'Main', 'title' => 'Hauptnavigation']);

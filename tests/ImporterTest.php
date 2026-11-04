@@ -107,6 +107,22 @@ final class ImporterTest extends TestCase
         self::assertArrayNotHasKey('page.publish', $byName, 'Without --publish everything stays a draft.');
     }
 
+    public function testTakesOverTheSettingsForSearchEngines(): void
+    {
+        $body = ['type' => 'doc', 'content' => [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'Wir']]]]];
+        $main = [['block' => 'acme/site/Text', 'fields' => ['columns' => [['body' => $body]]]]];
+
+        self::assertSame(
+            ['page.update' => [
+                'id' => '${p2.id}',
+                'excludeFromSiteSearch' => 'page',
+                'translations' => ['de' => ['content' => ['areas' => ['main' => $main]], 'description' => 'Wer wir sind und was wir tun.']],
+            ]],
+            $this->plan()->steps[5],
+            'The description of the address wins, on one line without tags.',
+        );
+    }
+
     public function testReportsWhatStaysBehind(): void
     {
         $plan = $this->plan();
@@ -114,6 +130,7 @@ final class ImporterTest extends TestCase
         self::assertSame([
             'The image team.jpg has no description (alt text) yet.',
             'Block 3 (Text) on page 2 "Über uns": a widget 7 in the text is left out.',
+            'Page 2 "Über uns" has its own title for search engines, "Wer wir sind"; Frootbox 2 has no field for it yet.',
             'Navigation "Main": the entry "Versteckt" is hidden and left out.',
             'The old address /alt leads to no page and gets no redirect.',
         ], $plan->report);

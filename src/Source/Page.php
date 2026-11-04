@@ -62,6 +62,25 @@ final class Page
         return Row::pathString($this->config, 'redirect', 'target');
     }
 
+    /**
+     * A setting for search engines from the configuration of the page:
+     * title, description or preventIndexing.
+     */
+    public function seo(string $key): string
+    {
+        return Row::pathString($this->config, 'seo', $key);
+    }
+
+    public function excludedFromSearchEngines(): bool
+    {
+        return self::isOn(Row::pathString($this->config, 'seo', 'preventIndexing'));
+    }
+
+    public function excludedFromSiteSearch(): bool
+    {
+        return self::isOn(Row::pathString($this->config, 'search', 'preventIndexing'));
+    }
+
     public function isRedirect(): bool
     {
         return 'Redirect' === $this->type || 'Redirect' === Row::pathString($this->config, 'pageType');
@@ -81,5 +100,13 @@ final class Page
     public function blocksIn(string $area): array
     {
         return array_values(array_filter($this->blocks, static fn(Block $block): bool => $block->area === $area));
+    }
+
+    /**
+     * A checkbox of Frootbox 1: "1" or "on" when ticked, empty when not.
+     */
+    private static function isOn(string $value): bool
+    {
+        return !\in_array(strtolower(trim($value)), ['', '0', 'false', 'off'], true);
     }
 }

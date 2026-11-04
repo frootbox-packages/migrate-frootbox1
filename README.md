@@ -82,3 +82,8 @@ stays a draft.
 
 Hidden blocks, plugins and entries of navigations stay behind, as do
 redirect pages: their address becomes a redirect to the target.
+
+Each page takes over its description for search engines (the one of its
+address wins, as in Frootbox 1, cut to 300 characters) and whether search
+engines or the site search leave it out. Frootbox 2 has no title of its
+own for search engines yet, so such a title goes into the report.

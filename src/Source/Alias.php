@@ -22,6 +22,9 @@ final readonly class Alias
         public string $language,
         public int $status,
         public string $target,
+        /** The title and description for search engines, set in the editor of Frootbox 1. */
+        public string $seoTitle = '',
+        public string $seoDescription = '',
     ) {}
 
     public function isRedirect(): bool

@@ -10,6 +10,8 @@ namespace Frootbox\MigrateFrootbox1\Import;
 
 use Frootbox\Core\Component\Components;
 use Frootbox\Core\Field\Field;
+use Frootbox\Core\Page\PageEditor;
+use Frootbox\Core\Page\Reach;
 use Frootbox\MigrateFrootbox1\Mapping\Mapping;
 use Frootbox\MigrateFrootbox1\Mapping\Rule;
 use Frootbox\MigrateFrootbox1\Mapping\Target;
@@ -42,6 +44,12 @@ use Frootbox\RichText\HtmlReader;
  */
 final class Importer
 {
+    /** The text of a consent in Frootbox 1 without its own, by language. */
+    private const array PRIVACY_TEXTS = [
+        'de' => 'Ich habe die [Datenschutzerklärung] gelesen und akzeptiere diese.',
+        'en' => 'I have read and accept the [privacy policy].',
+    ];
+
     /** @var list<array<string, mixed>> */
     private array $media = [];
 
@@ -138,7 +146,19 @@ final class Importer
             if (isset($this->created[$page->id])) {
                 $layout = $this->mapping->layouts['' === $page->view() ? 'Default' : $page->view()];
                 $blocks = $this->content($page);
-                $content[] = ['page.update' => ['id' => $this->ref($page->id), 'translations' => [$this->code => ['content' => ['areas' => [$layout['area'] => $blocks]]]]]];
+                $translation = ['content' => ['areas' => [$layout['area'] => $blocks]]];
+                $description = $this->description($page);
+
+                if ('' !== $description) {
+                    $translation['description'] = $description;
+                }
+
+                $content[] = ['page.update' => array_filter([
+                    'id' => $this->ref($page->id),
+                    'excludeFromSearchEngines' => $page->excludedFromSearchEngines() ? Reach::Page->value : null,
+                    'excludeFromSiteSearch' => $page->excludedFromSiteSearch() ? Reach::Page->value : null,
+                    'translations' => [$this->code => $translation],
+                ], static fn(mixed $value): bool => null !== $value)];
             }
         }
 
@@ -206,6 +226,64 @@ final class Importer
         }
 
         return null;
+    }
+
+    /**
+     * The page of the privacy policy, found as in Frootbox 1 by its address.
+     */
+    private function privacyPage(): ?int
+    {
+        foreach ($this->site->pages as $page) {
+            if ($page->language === $this->language && isset($this->created[$page->id]) && 1 === preg_match('/datenschutz|privacy/i', $page->path)) {
+                return $page->id;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The description for search engines: the one of the address of the page
+     * wins, as in Frootbox 1. Frootbox 2 has no title of its own for search
+     * engines yet (decision 0223), so a title stays in the report.
+     */
+    private function description(Page $page): string
+    {
+        $title = self::squeeze($page->seo('title'));
+        $description = self::squeeze($page->seo('description'));
+
+        foreach ($this->site->aliases as $alias) {
+            if ('Pages' === $alias->owner && $alias->itemId === $page->id && !$alias->isRedirect()) {
+                if ('' !== self::squeeze($alias->seoTitle)) {
+                    $title = self::squeeze($alias->seoTitle);
+                }
+
+                if ('' !== self::squeeze($alias->seoDescription)) {
+                    $description = self::squeeze($alias->seoDescription);
+                }
+            }
+        }
+
+        if ('' !== $title && $title !== $page->title) {
+            $this->note(\sprintf('Page %d "%s" has its own title for search engines, "%s"; Frootbox 2 has no field for it yet.', $page->id, $page->title, $title));
+        }
+
+        if (mb_strlen($description) > PageEditor::DESCRIPTION_MAX) {
+            $cut = mb_substr($description, 0, PageEditor::DESCRIPTION_MAX - 1);
+            $space = mb_strrpos($cut, ' ');
+            $description = rtrim(false === $space ? $cut : mb_substr($cut, 0, $space), " ,.;:-") . '…';
+            $this->note(\sprintf('Page %d "%s": the description for search engines is cut to %d characters.', $page->id, $page->title, PageEditor::DESCRIPTION_MAX));
+        }
+
+        return $description;
+    }
+
+    /**
+     * A text of Frootbox 1 on one line, without tags.
+     */
+    private static function squeeze(string $text): string
+    {
+        return trim((string) preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags($text), \ENT_QUOTES | \ENT_HTML5)));
     }
 
     private function ref(int $page): string
@@ -757,11 +835,27 @@ final class Importer
                 } elseif (null === $type) {
                     $this->note(\sprintf('%s: the field "%s" (%s) of the form is left out.', $this->where, $field->title, Row::pathString($field->config, 'type')));
                 } else {
+                    $label = $field->title;
+                    $link = null;
+
+                    // Frootbox 1 shows its own text with the privacy policy in brackets (decision 0259).
+                    if ('consent' === $type) {
+                        $privacy = $this->privacyPage();
+                        $own = self::squeeze(Row::pathString($field->config, 'privacyText'));
+                        $label = '' !== $own ? $own : self::PRIVACY_TEXTS[$this->code] ?? $label;
+                        $link = null === $privacy ? null : 'page:' . $this->ref($privacy);
+
+                        if (null === $privacy) {
+                            $this->note(\sprintf('%s: no page of the privacy policy found for the consent of the form, the field has no link.', $this->where));
+                        }
+                    }
+
                     $add[] = ['frootbox/forms/form.field-add' => array_filter([
                         'id' => '${' . $name . '.id}',
                         'type' => $type,
-                        'translations' => [$this->code => ['label' => $field->title]],
+                        'translations' => [$this->code => ['label' => $label]],
                         'required' => 'consent' === $type ? null : true === ($field->config['mandatory'] ?? false),
+                        'link' => $link,
                     ], static fn(mixed $value): bool => null !== $value)];
                 }
             }
