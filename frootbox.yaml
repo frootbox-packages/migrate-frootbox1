@@ -1,0 +1,3 @@
+title: Migration from Frootbox 1
+description: Analyse a website of Frootbox 1 and import it through actions, for development only
+extension: Frootbox\MigrateFrootbox1\MigrateExtension

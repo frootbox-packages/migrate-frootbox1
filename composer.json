@@ -1,0 +1,33 @@
+{
+    "name": "frootbox/migrate-frootbox1",
+    "description": "Moves websites from Frootbox 1 to Frootbox 2: analyse the old database, map blocks and plugins, import through actions",
+    "type": "frootbox-extension",
+    "license": "MIT",
+    "keywords": [
+        "cms",
+        "frootbox",
+        "migration"
+    ],
+    "require": {
+        "php": ">=8.5",
+        "doctrine/dbal": "^4.5",
+        "frootbox/core": "^0.1",
+        "symfony/console": "^8.1",
+        "symfony/yaml": "^8.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Frootbox\\MigrateFrootbox1\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Frootbox\\MigrateFrootbox1\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "0.1.x-dev"
+        }
+    }
+}
