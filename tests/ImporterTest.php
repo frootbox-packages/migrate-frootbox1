@@ -116,10 +116,10 @@ final class ImporterTest extends TestCase
             ['page.update' => [
                 'id' => '${p2.id}',
                 'excludeFromSiteSearch' => 'page',
-                'translations' => ['de' => ['content' => ['areas' => ['main' => $main]], 'description' => 'Wer wir sind und was wir tun.']],
+                'translations' => ['de' => ['content' => ['areas' => ['main' => $main]], 'description' => 'Wer wir sind und was wir tun.', 'seoTitle' => 'Wer wir sind']],
             ]],
             $this->plan()->steps[5],
-            'The description of the address wins, on one line without tags.',
+            'Title and description of the address win, on one line without tags.',
         );
     }
 
@@ -130,7 +130,6 @@ final class ImporterTest extends TestCase
         self::assertSame([
             'The image team.jpg has no description (alt text) yet; the mapping can give it one under media.',
             'Block 3 (Text) on page 2 "Über uns": a widget 7 in the text is left out.',
-            'Page 2 "Über uns" has its own title for search engines, "Wer wir sind"; Frootbox 2 has no field for it yet.',
             'Navigation "Main": the entry "Versteckt" is hidden and left out.',
             'The old address /alt leads to no page and gets no redirect.',
         ], $plan->report);

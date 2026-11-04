@@ -147,10 +147,14 @@ final class Importer
                 $layout = $this->mapping->layouts['' === $page->view() ? 'Default' : $page->view()];
                 $blocks = $this->content($page);
                 $translation = ['content' => ['areas' => [$layout['area'] => $blocks]]];
-                $description = $this->description($page);
+                [$seoTitle, $description] = $this->seo($page);
 
                 if ('' !== $description) {
                     $translation['description'] = $description;
+                }
+
+                if ('' !== $seoTitle) {
+                    $translation['seoTitle'] = $seoTitle;
                 }
 
                 $content[] = ['page.update' => array_filter([
@@ -243,11 +247,14 @@ final class Importer
     }
 
     /**
-     * The description for search engines: the one of the address of the page
-     * wins, as in Frootbox 1. Frootbox 2 has no title of its own for search
-     * engines yet (decision 0223), so a title stays in the report.
+     * Title and description for search engines: the ones of the address of
+     * the page win, as in Frootbox 1. A title the same as the one of the page
+     * is left out, Frootbox 2 then builds it with the name of the website
+     * (decisions 0260, 0266).
+     *
+     * @return array{string, string}
      */
-    private function description(Page $page): string
+    private function seo(Page $page): array
     {
         $title = self::squeeze($page->seo('title'));
         $description = self::squeeze($page->seo('description'));
@@ -264,18 +271,32 @@ final class Importer
             }
         }
 
-        if ('' !== $title && $title !== $page->title) {
-            $this->note(\sprintf('Page %d "%s" has its own title for search engines, "%s"; Frootbox 2 has no field for it yet.', $page->id, $page->title, $title));
+        if ($title === $page->title) {
+            $title = '';
+        }
+
+        if (mb_strlen($title) > PageEditor::SEO_TITLE_MAX) {
+            $title = self::cut($title, PageEditor::SEO_TITLE_MAX);
+            $this->note(\sprintf('Page %d "%s": the title for search engines is cut to %d characters.', $page->id, $page->title, PageEditor::SEO_TITLE_MAX));
         }
 
         if (mb_strlen($description) > PageEditor::DESCRIPTION_MAX) {
-            $cut = mb_substr($description, 0, PageEditor::DESCRIPTION_MAX - 1);
-            $space = mb_strrpos($cut, ' ');
-            $description = rtrim(false === $space ? $cut : mb_substr($cut, 0, $space), " ,.;:-") . '…';
+            $description = self::cut($description, PageEditor::DESCRIPTION_MAX);
             $this->note(\sprintf('Page %d "%s": the description for search engines is cut to %d characters.', $page->id, $page->title, PageEditor::DESCRIPTION_MAX));
         }
 
-        return $description;
+        return [$title, $description];
+    }
+
+    /**
+     * At most so many characters, at a word with an ellipsis.
+     */
+    private static function cut(string $text, int $max): string
+    {
+        $cut = mb_substr($text, 0, $max - 1);
+        $space = mb_strrpos($cut, ' ');
+
+        return rtrim(false === $space ? $cut : mb_substr($cut, 0, $space), " ,.;:-") . '…';
     }
 
     /**
