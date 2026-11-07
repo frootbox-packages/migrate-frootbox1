@@ -23,6 +23,7 @@ use Frootbox\MigrateFrootbox1\Source\Page;
 use Frootbox\MigrateFrootbox1\Source\Row;
 use Frootbox\MigrateFrootbox1\Source\Site;
 use Frootbox\MigrateFrootbox1\Source\Text;
+use Frootbox\MigrateFrootbox1\Source\Widget;
 use Frootbox\RichText\HtmlReader;
 
 /**
@@ -392,7 +393,8 @@ final class Importer
         }
 
         $fields = $this->fields($rule, $content, $component->fields);
-        $options = $this->placeholders($rule->options, $config);
+        $widget = array_values($this->widgets($rule, $content))[0] ?? null;
+        $options = $this->placeholders($rule->options, $config, $widget->config ?? []);
 
         if ($rule->form && null !== $element) {
             $form = $this->form($element);
@@ -452,10 +454,11 @@ final class Importer
             }
         }
 
-        foreach ($this->widgets($rule, $content) as $field => $file) {
+        foreach ($this->widgets($rule, $content) as $field => $widget) {
             $definition = $schema[$field] ?? null;
+            $file = array_values($widget->content->files)[0][0] ?? null;
 
-            if (null !== $definition && 'image' === $definition->type) {
+            if (null !== $definition && 'image' === $definition->type && null !== $file) {
                 $fields[$field] = $this->image($file);
             }
         }
@@ -738,13 +741,13 @@ final class Importer
     }
 
     /**
-     * The first image of each widget the rule takes, by field.
+     * The first widget with an image of each kind the rule takes, by field.
      *
-     * @return array<string, File>
+     * @return array<string, Widget>
      */
     private function widgets(Rule $rule, Content $content): array
     {
-        $files = [];
+        $widgets = [];
 
         foreach ($content->texts as $languages) {
             $text = $languages[$this->language] ?? null;
@@ -756,13 +759,13 @@ final class Importer
                 $field = null === $widget ? null : ($rule->widgets[$widget->type()] ?? null);
                 $file = null === $widget ? null : (array_values($widget->content->files)[0][0] ?? null);
 
-                if (null !== $field && null !== $file && !isset($files[$field])) {
-                    $files[$field] = $file;
+                if (null !== $field && null !== $file && !isset($widgets[$field])) {
+                    $widgets[$field] = $widget;
                 }
             }
         }
 
-        return $files;
+        return $widgets;
     }
 
     /**
@@ -1106,19 +1109,21 @@ final class Importer
     }
 
     /**
-     * Replaces "{page:5}" with the new page and "{config.x}" with a value of the old configuration.
+     * Replaces "{page:5}" with the new page, "{config.x}" with a value of the
+     * old configuration and "{widget.x}" with one of the first image in the text.
      *
      * @param array<string, mixed> $values
      * @param array<string, mixed> $config
+     * @param array<string, mixed> $widget
      *
      * @return array<string, mixed>
      */
-    private function placeholders(array $values, array $config): array
+    private function placeholders(array $values, array $config, array $widget = []): array
     {
         foreach ($values as $key => $value) {
             // { value: '{config.x}', map: { old: new } } translates a value.
             if (\is_array($value) && 2 === \count($value) && isset($value['value'], $value['map']) && \is_array($value['map'])) {
-                $old = $this->placeholders(['value' => $value['value']], $config)['value'] ?? null;
+                $old = $this->placeholders(['value' => $value['value']], $config, $widget)['value'] ?? null;
                 $old = \is_scalar($old) ? (string) $old : '';
                 $map = Row::map($value['map']);
 
@@ -1135,14 +1140,14 @@ final class Importer
             }
 
             if (\is_array($value)) {
-                $values[$key] = $this->placeholders(Row::map($value), $config);
+                $values[$key] = $this->placeholders(Row::map($value), $config, $widget);
 
                 if (array_is_list($value)) {
                     $values[$key] = array_values($values[$key]);
                 }
             } elseif (\is_string($value)) {
-                $whole = 1 === preg_match('/^\{config\.[a-zA-Z0-9_.]+\}$/', $value);
-                $values[$key] = (string) preg_replace_callback('/\{(page:(\d+)|config\.([a-zA-Z0-9_.]+))\}/', function (array $match) use ($config): string {
+                $whole = 1 === preg_match('/^\{(config|widget)\.[a-zA-Z0-9_.]+\}$/', $value);
+                $values[$key] = (string) preg_replace_callback('/\{(page:(\d+)|(config|widget)\.([a-zA-Z0-9_.]+))\}/', function (array $match) use ($config, $widget): string {
                     if ('' !== ($match[2] ?? '')) {
                         $page = $this->resolve((int) $match[2]);
 
@@ -1155,7 +1160,7 @@ final class Importer
                         return 'page:' . $this->ref($page);
                     }
 
-                    return Row::pathString($config, ...explode('.', $match[3] ?? ''));
+                    return Row::pathString('widget' === ($match[3] ?? '') ? $widget : $config, ...explode('.', $match[4] ?? ''));
                 }, $value);
 
                 // A single placeholder without a value leaves the option out.

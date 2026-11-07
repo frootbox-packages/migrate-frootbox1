@@ -70,7 +70,9 @@ media:                              # by the file name in Frootbox 1
 ```
 
 `{page:5}` is the new page of page 5 in Frootbox 1, `{config.x}` a value
-in the configuration of the old block (or page). `{ value: …, map: … }`
+in the configuration of the old block (or page), `{widget.x}` one of the
+first image the block takes from its text, e.g. `{widget.align}` or
+`{widget.width}` (of 12 columns). `{ value: …, map: … }`
 translates such a value; an option without a value is left out. Objects
 give their title, their linked page and plain values such as the
 `position` of a contact person; the contact persons of a plugin are the

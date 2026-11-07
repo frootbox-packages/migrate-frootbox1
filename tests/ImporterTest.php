@@ -176,6 +176,14 @@ final class ImporterTest extends TestCase
         self::assertSame(['block' => 'acme/site/Gallery', 'fields' => ['items' => [['image' => ['media' => '${m5.id}']], ['image' => ['media' => '${m4.id}']]]]], $about[0], 'Highest orderId first, as Frootbox 1 shows them.');
     }
 
+    public function testAnOptionTakesAValueOfTheImageInTheText(): void
+    {
+        $plan = $this->plan(textOptions: ['image' => ['value' => '{widget.align}', 'map' => ['right' => 'aside', 'justify' => 'below']], 'imageWidth' => '{widget.width}']);
+        $text = self::main($plan->steps[4])[1] ?? null;
+
+        self::assertSame(['image' => 'aside', 'imageWidth' => 6], self::at($text, 'options'), 'The widget sits on the right with 6 of 12 columns.');
+    }
+
     public function testTheMappingFillsInWhatAFileLacks(): void
     {
         $plan = $this->plan(media: ['team.jpg' => ['alt' => 'Das Team vor der Praxis', 'copyright' => 'Max Muster']]);
@@ -223,8 +231,9 @@ final class ImporterTest extends TestCase
     /**
      * @param array<string, array<string, string>> $media
      * @param array<string, mixed>|null           $page
+     * @param array<string, mixed>                $textOptions
      */
-    private function plan(bool $publish = false, array $media = [], ?array $page = null, bool $persons = false, bool $gallery = false): Plan
+    private function plan(bool $publish = false, array $media = [], ?array $page = null, bool $persons = false, bool $gallery = false, array $textOptions = []): Plan
     {
         $text = self::block('acme/site/Text', [
             'title' => new Field('title', 'headline', 'Title', optional: true),
@@ -249,7 +258,7 @@ final class ImporterTest extends TestCase
             'domains' => ['www.example.com'],
             'layouts' => ['Default' => 'acme/site/Page'],
             'blocks' => [
-                'Text' => ['block' => 'acme/site/Text', 'fields' => ['title' => 'title', 'text-#' => 'columns.#.body'], 'widgets' => ['Core/Images/Thumbnail' => 'image']],
+                'Text' => ['block' => 'acme/site/Text', 'fields' => ['title' => 'title', 'text-#' => 'columns.#.body'], 'widgets' => ['Core/Images/Thumbnail' => 'image'], 'options' => $textOptions],
                 'Teaser1' => ['block' => 'acme/site/Topics', 'fields' => ['title' => 'title', 'teasers' => 'items']],
                 'Gallery' => $gallery ? ['block' => 'acme/site/Gallery', 'fields' => ['images' => 'items.#.image']] : false,
             ],
