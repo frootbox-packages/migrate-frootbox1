@@ -170,8 +170,11 @@ final readonly class SiteReader
                 Row::int($row, 'visibility') > 0,
                 Row::json($row, 'config'),
                 $content('ContentElements:' . $id),
+                'Inherited' === Row::string($row, 'inheritance'),
             );
         }
+
+        $this->inherit($pages);
 
         $widgets = [];
 
@@ -270,5 +273,41 @@ final readonly class SiteReader
         }
 
         return $rows;
+    }
+
+    /**
+     * Frootbox 1 shows an element marked "Inherited" on its page and on
+     * every page below, e.g. a slider with images per page, sorted in
+     * with the elements of the page by orderId.
+     *
+     * @param array<int, Page> $pages
+     */
+    private function inherit(array $pages): void
+    {
+        $inherited = [];
+
+        foreach ($pages as $page) {
+            foreach ($page->elements as $element) {
+                if ($element->inherited) {
+                    $inherited[$page->id][] = $element;
+                }
+            }
+        }
+
+        foreach ($pages as $page) {
+            $added = [];
+            $seen = [$page->id => true];
+
+            for ($parent = $pages[$page->parentId] ?? null; null !== $parent && !isset($seen[$parent->id]); $parent = $pages[$parent->parentId] ?? null) {
+                $seen[$parent->id] = true;
+                $added = [...$added, ...$inherited[$parent->id] ?? []];
+            }
+
+            if ([] !== $added) {
+                $elements = [...$page->elements, ...$added];
+                usort($elements, static fn(Element $a, Element $b): int => [$b->orderId, $a->id] <=> [$a->orderId, $b->id]);
+                $page->elements = $elements;
+            }
+        }
     }
 }

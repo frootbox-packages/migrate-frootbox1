@@ -23,7 +23,7 @@ final class OldSite
         'content_texts' => 'id INTEGER PRIMARY KEY, uid TEXT, text TEXT, config TEXT, language TEXT',
         'files' => 'id INTEGER PRIMARY KEY, folderId INT, orderId INT, title TEXT, name TEXT, type TEXT, size INT, path TEXT, uid TEXT, copyright TEXT, config TEXT',
         'assets' => 'id INTEGER PRIMARY KEY, pageId INT, pluginId INT, parentId INT, orderId INT, className TEXT, uid TEXT, title TEXT, config TEXT, visibility INT',
-        'content_elements' => 'id INTEGER PRIMARY KEY, pageId INT, socket TEXT, orderId INT, className TEXT, title TEXT, config TEXT, visibility INT',
+        'content_elements' => 'id INTEGER PRIMARY KEY, pageId INT, socket TEXT, orderId INT, className TEXT, title TEXT, config TEXT, visibility INT, inheritance TEXT',
         'content_widgets' => 'id INTEGER PRIMARY KEY, className TEXT, config TEXT, textUid TEXT',
         'aliases' => 'id INTEGER PRIMARY KEY, alias TEXT, pageId INT, itemId INT, itemModel TEXT, language TEXT, status INT, config TEXT',
         'navigations' => 'id INTEGER PRIMARY KEY, navId TEXT, title TEXT',
@@ -80,6 +80,28 @@ final class OldSite
         $connection->insert('navigations_items', ['id' => 2, 'navId' => 1, 'parentId' => 0, 'title' => 'Versteckt', 'className' => 'Frootbox\Ext\Core\Navigation\Navigations\Items\Page\Item', 'config' => '{"pageId":"1"}', 'visibility' => 0]);
 
         return $connection;
+    }
+
+    /**
+     * On the start page a slider shown on every page below with images by
+     * page (none for the start page) and a sub navigation without a heading
+     * of its own; in the text of page 2 a gallery widget with two images;
+     * page 2 has an image and a teaser of its own.
+     */
+    public static function tree(Connection $connection): void
+    {
+        $connection->insert('content_elements', ['id' => 2, 'pageId' => 1, 'socket' => 'Emotional', 'orderId' => 1, 'className' => 'Frootbox\Ext\Core\Images\Plugins\Slider\Plugin', 'title' => 'Bilder', 'visibility' => 1, 'inheritance' => 'Inherited']);
+        $connection->insert('content_elements', ['id' => 3, 'pageId' => 1, 'socket' => 'MainContent', 'orderId' => 1, 'className' => 'Frootbox\Ext\Core\Navigation\Plugins\SubNavigation\Plugin', 'title' => 'Unsere Seiten', 'visibility' => 1, 'inheritance' => 'None']);
+        $elements = 'Frootbox-Persistence-Repositories-ContentElements';
+        $connection->insert('files', ['id' => 20, 'orderId' => 1, 'name' => 'hinten.jpg', 'type' => 'image/jpeg', 'size' => 10, 'path' => 'uploads/kopf.jpg', 'uid' => $elements . ':2:files-2']);
+        $connection->insert('files', ['id' => 21, 'orderId' => 2, 'name' => 'vorne.jpg', 'type' => 'image/jpeg', 'size' => 10, 'path' => 'uploads/team.jpg', 'uid' => $elements . ':2:files-2']);
+        $connection->insert('content_widgets', ['id' => 7, 'className' => 'Frootbox\Ext\Core\Images\Widgets\Gallery\Widget', 'config' => '{"imageColumns":"4"}', 'textUid' => self::BLOCKS . ':3:text-1']);
+        $widgets = 'Frootbox-Persistence-Content-Repositories-Widgets';
+        $connection->insert('files', ['id' => 22, 'orderId' => 1, 'name' => 'b.jpg', 'type' => 'image/jpeg', 'size' => 10, 'path' => 'uploads/kopf.jpg', 'uid' => $widgets . ':7:images']);
+        $connection->insert('files', ['id' => 23, 'orderId' => 2, 'name' => 'a.jpg', 'type' => 'image/jpeg', 'size' => 10, 'path' => 'uploads/team.jpg', 'uid' => $widgets . ':7:images']);
+        $pages = 'Frootbox-Persistence-Repositories-Pages';
+        $connection->insert('files', ['id' => 24, 'name' => 'seite.jpg', 'type' => 'image/jpeg', 'size' => 10, 'path' => 'uploads/kopf.jpg', 'uid' => $pages . ':2:image']);
+        $connection->insert('content_texts', ['uid' => $pages . ':2:teaser-text', 'text' => '<p>Wer wir sind</p>', 'language' => 'de-DE']);
     }
 
     /**

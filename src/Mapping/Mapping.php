@@ -291,6 +291,12 @@ final readonly class Mapping
             };
         }
 
+        $needs = [];
+
+        foreach (\is_string($rule['needs'] ?? null) ? [$rule['needs']] : Row::map($rule['needs'] ?? []) as $name) {
+            $needs[] = self::name($name, $where . '.needs');
+        }
+
         return new Rule(
             null !== $plugin && !\array_key_exists('block', $rule) ? '' : self::name($rule['block'] ?? null, $where . '.block'),
             \is_string($rule['variant'] ?? null) ? $rule['variant'] : null,
@@ -300,6 +306,7 @@ final readonly class Mapping
             $widgets,
             true === ($rule['form'] ?? false),
             $plugin,
+            $needs,
         );
     }
 

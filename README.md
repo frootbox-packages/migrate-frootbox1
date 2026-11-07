@@ -53,12 +53,15 @@ plugins:
   Core/Navigation/Teaser@Index06: { block: acme/theme/Stage, fields: { items.1.background: image } }
   Core/ContactForms/FormTeaser@Index01: { block: frootbox/forms/Form, form: true }
   145: { block: frootbox/theme-base/VideoEmbed }  # one plugin by its ID, before the rule of its type
+  7: { block: acme/theme/Stage, needs: items, fields: { 'files-{page}': items.#.image } }  # images by page
+  Core/Navigation/SubNavigation@Index05: { block: acme/theme/Cards, fields: { title: title, children: items } }
   Core/FileManager/CopyrightFilesList@Index01: { block: frootbox/theme-base/ImageCredits }
   Core/HelpAndSupport/ContactPersons@Index01: { block: acme/theme/Team, fields: { persons: people } }
   Core/News/Archive@Index01: { plugin: frootbox/news/article }  # the page shows the plugin
 items:
   Teaser: { fields: { title: title, text: text, link: { to: link, text: More } } }
   Contact: { fields: { title: name, position: role, phone: phone, email: email, image: image } }
+  Page: { fields: { title: title, image: image, teaser-text: text, link: link } }  # pages below, see children
 page:                               # fields of the page itself, as a block on top
   block: acme/theme/Banner
   area: head                        # optional: an area of its own instead of the top of main
@@ -94,7 +97,16 @@ of the plugin itself (one with `plugin: true`, e.g.
 `frootbox/shop/Catalog`), it becomes the view of the plugin with its
 fields and options instead of a block in the area. The layout of the page needs a
 place for a plugin. Of several files in one field the import takes the one
-Frootbox 1 shows. Each value is converted by the type
+Frootbox 1 shows. A plugin marked "Inherited" in Frootbox 1 shows on its
+page and every page below; `{page}` in the name of a field is the page
+it shows on, e.g. `files-{page}` for a slider with images by page, and
+`needs` leaves the block out where such a field stays empty. A plugin
+without a heading of its own gets its title, as Frootbox 1 showed it.
+`children` gives the public pages below the page as objects of type
+`Page` with their title, link and fields such as `image` and
+`teaser-text`, e.g. for a sub navigation. A widget in the text fills a
+list with all its files with `widgets: { Core/Images/Gallery:
+images.#.image }`. Each value is converted by the type
 of the target field: HTML becomes rich text, links to old pages and
 aliases become links to the new pages, files become media.
 Under `media` the mapping fills in an alt text or a copyright that a file

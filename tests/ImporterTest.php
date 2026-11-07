@@ -322,6 +322,43 @@ final class ImporterTest extends TestCase
         self::assertSame(['alt' => 'Eine Fähre'], $mapping->textsOf("fa\u{308}hre.png"), 'The name as a Mac uploads it.');
     }
 
+    public function testAnInheritedPluginShowsOnThePagesBelowWithTheirOwnFiles(): void
+    {
+        $plan = $this->plan(tree: true, plugins: [
+            'Core/Images/Slider@Index01' => ['block' => 'acme/site/Gallery', 'needs' => 'items', 'fields' => ['files-{page}' => 'items.#.image']],
+            'Core/Navigation/SubNavigation@Index01' => false,
+        ]);
+        $start = self::main(array_values(array_filter($plan->steps, static fn(array $step): bool => '${p1.id}' === self::at($step, 'page.update', 'id')))[0]);
+        $about = self::main(array_values(array_filter($plan->steps, static fn(array $step): bool => '${p2.id}' === self::at($step, 'page.update', 'id')))[0]);
+
+        self::assertNotContains('acme/site/Gallery', array_column($start, 'block'), 'No images for the start page, so no block.');
+        self::assertSame(['block' => 'acme/site/Gallery', 'fields' => ['items' => [['image' => ['media' => '${m21.id}']], ['image' => ['media' => '${m20.id}']]]]], $about[0], 'The images of page 2, first above the content.');
+        self::assertSame([], array_filter($plan->report, static fn(string $note): bool => str_contains($note, 'files-')), 'The images of other pages are no loss.');
+    }
+
+    public function testAGalleryInTheTextGivesAllItsImages(): void
+    {
+        $plan = $this->plan(tree: true, widgets: ['Core/Images/Gallery' => 'gallery.#.image'], plugins: ['Core/Images/Slider@Index01' => false, 'Core/Navigation/SubNavigation@Index01' => false]);
+        $about = self::main(array_values(array_filter($plan->steps, static fn(array $step): bool => '${p2.id}' === self::at($step, 'page.update', 'id')))[0]);
+        $text = array_values(array_filter($about, static fn(mixed $block): bool => 'acme/site/Text' === self::at($block, 'block')))[0] ?? null;
+
+        self::assertSame([['image' => ['media' => '${m23.id}']], ['image' => ['media' => '${m22.id}']]], self::at($text, 'fields', 'gallery'));
+    }
+
+    public function testTheSubNavigationListsThePagesBelowWithTheirOwnFields(): void
+    {
+        $plan = $this->plan(tree: true, plugins: [
+            'Core/Images/Slider@Index01' => false,
+            'Core/Navigation/SubNavigation@Index01' => ['block' => 'acme/site/Topics', 'fields' => ['title' => 'title', 'children' => 'items']],
+        ], items: ['Page' => ['fields' => ['title' => 'title', 'link' => 'link', 'image' => false, 'teaser-text' => false]]]);
+        $start = self::main(array_values(array_filter($plan->steps, static fn(array $step): bool => '${p1.id}' === self::at($step, 'page.update', 'id')))[0]);
+        $topics = array_values(array_filter($start, static fn(mixed $block): bool => 'Unsere Seiten' === self::at($block, 'fields', 'title')))[0] ?? null;
+
+        self::assertNotNull($topics, 'The title of the plugin is its heading, as Frootbox 1 showed it.');
+        self::assertSame(['title' => 'Über uns', 'link' => ['target' => 'page:${p2.id}', 'text' => 'Über uns']], self::at($topics, 'fields', 'items', 0));
+        self::assertSame([], array_filter($plan->report, static fn(string $note): bool => str_contains($note, 'of the page is left out')), 'The fields of a page go to the list.');
+    }
+
     public function testRejectsAMappingThatIsNotFilledIn(): void
     {
         $this->expectException(MappingException::class);
@@ -368,13 +405,17 @@ final class ImporterTest extends TestCase
      * @param array<string, list<array<string, mixed>>> $menus Navigations of Frootbox 2 written by the mapping
      * @param array<string, string|bool>          $widgets     Widgets in the text of the block Text
      * @param array<int, mixed>                   $blocks      Rules for single blocks by their ID
+     * @param array<int|string, mixed>            $plugins     More rules for plugins
+     * @param array<string, mixed>                $items       More rules for objects
+     * @param bool                                $tree        With an inherited slider, a sub navigation and a gallery widget
      */
-    private function plan(bool $publish = false, array $media = [], ?array $page = null, array $pages = [], bool $persons = false, bool $gallery = false, array $textOptions = [], ?array $teaser = null, bool $pluginPlace = true, ?array $content = null, array $menus = [], array $widgets = ['Core/Images/Thumbnail' => 'image'], array $blocks = []): Plan
+    private function plan(bool $publish = false, array $media = [], ?array $page = null, array $pages = [], bool $persons = false, bool $gallery = false, array $textOptions = [], ?array $teaser = null, bool $pluginPlace = true, ?array $content = null, array $menus = [], array $widgets = ['Core/Images/Thumbnail' => 'image'], array $blocks = [], array $plugins = [], array $items = [], bool $tree = false): Plan
     {
         $text = self::block('acme/site/Text', [
             'title' => new Field('title', 'headline', 'Title', optional: true),
             'columns' => new Field('columns', 'list', 'Columns', fields: ['body' => new Field('body', 'richtext', 'Text')]),
             'image' => new Field('image', 'image', 'Image', optional: true),
+            'gallery' => new Field('gallery', 'list', 'Gallery', optional: true, fields: ['image' => new Field('image', 'image', 'Image')]),
         ]);
         $topics = self::block('acme/site/Topics', [
             'title' => new Field('title', 'headline', 'Title', optional: true),
@@ -400,8 +441,8 @@ final class ImporterTest extends TestCase
                 'Teaser1' => ['block' => 'acme/site/Topics', 'fields' => ['title' => 'title', 'teasers' => 'items']],
                 'Gallery' => $gallery ? ['block' => 'acme/site/Gallery', 'fields' => ['images' => 'items.#.image']] : false,
             ],
-            'plugins' => ['Core/Navigation/Teaser@Index06' => $teaser ?? ($persons ? ['block' => 'acme/site/Topics', 'fields' => ['persons' => 'items', 'items' => false]] : false)],
-            'items' => [
+            'plugins' => $plugins + ['Core/Navigation/Teaser@Index06' => $teaser ?? ($persons ? ['block' => 'acme/site/Topics', 'fields' => ['persons' => 'items', 'items' => false]] : false)],
+            'items' => $items + [
                 'Teaser' => ['fields' => ['title' => 'title', 'link' => ['to' => 'link', 'text' => 'Mehr'], 'background' => false]],
                 'Contact' => ['fields' => ['position' => 'title', 'image' => false]],
             ],
@@ -417,6 +458,10 @@ final class ImporterTest extends TestCase
 
         if ($persons) {
             OldSite::persons($old);
+        }
+
+        if ($tree) {
+            OldSite::tree($old);
         }
 
         return new Importer(new SiteReader($old)->read(), $mapping, $components, $this->files)->plan($publish);

@@ -25,6 +25,8 @@ final readonly class Element
         public bool $visible,
         public array $config,
         public Content $content,
+        /** Frootbox 1 also shows it on every page below its page ("Inherited"). */
+        public bool $inherited = false,
     ) {}
 
     /**

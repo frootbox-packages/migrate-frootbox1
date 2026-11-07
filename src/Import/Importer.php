@@ -87,6 +87,12 @@ final class Importer
 
     private string $where = '';
 
+    /** The page of Frootbox 1 whose content is converted, for "{page}" in names of fields. */
+    private int $page = 0;
+
+    /** The plugin whose fields are converted, for its title. */
+    private ?Element $element = null;
+
     public function __construct(
         private readonly Site $site,
         private readonly Mapping $mapping,
@@ -352,6 +358,7 @@ final class Importer
         $above = $page->blocksIn('block-content');
         $below = array_filter($page->blocks, static fn($block): bool => 'block-content' !== $block->area);
         $blocks = [];
+        $this->page = $page->id;
         $this->where = \sprintf('Page %d "%s"', $page->id, $page->title);
 
         if (null !== $this->mapping->page) {
@@ -362,7 +369,8 @@ final class Importer
             } elseif (null !== $block) {
                 $blocks[] = $block;
             }
-        } else {
+        } elseif (!isset($this->mapping->items['Page'])) {
+            // With "items.Page" the fields of a page go to the list of a sub navigation above it.
             foreach ($page->content->fields() as $field) {
                 if ($this->filled($page->content, $field)) {
                     $this->note(\sprintf('%s: the field "%s" of the page is left out, the mapping has no "page".', $this->where, $field));
@@ -483,9 +491,17 @@ final class Importer
             return null;
         }
 
+        $this->element = $element;
         $fields = $this->fields($rule, $content, $component->fields);
+        $this->element = null;
         $widget = array_values($this->widgets($rule, $content))[0] ?? null;
         $options = $this->placeholders($rule->options, $config, $widget->config ?? []);
+
+        foreach ($rule->needs as $name) {
+            if (null === ($fields[$name] ?? null) || [] === $fields[$name] || '' === $fields[$name]) {
+                return null;
+            }
+        }
 
         if ($rule->form && null !== $element) {
             $form = $this->form($element);
@@ -516,6 +532,19 @@ final class Importer
         $used = [];
 
         foreach ($rule->fields as $old => $target) {
+            // "files-{page}": the field of the page whose content this is, e.g. the images of an inherited slider.
+            if (str_contains($old, '{page}')) {
+                $pattern = '/^' . str_replace('\\{page\\}', '\\d+', preg_quote($old, '/')) . '$/';
+
+                foreach ($content->fields() as $field) {
+                    if (1 === preg_match($pattern, $field)) {
+                        $used[$field] = true;
+                    }
+                }
+
+                $old = str_replace('{page}', (string) $this->page, $old);
+            }
+
             foreach ($this->sources($old, $content, $item, null !== $target && str_contains($target->path, '.#.')) as [$number, $field, $value]) {
                 $used[$field] = true;
 
@@ -546,11 +575,18 @@ final class Importer
         }
 
         foreach ($this->widgets($rule, $content) as $field => $widget) {
-            $definition = $schema[$field] ?? null;
-            $file = array_values($widget->content->files)[0][0] ?? null;
+            $definition = $this->definition($field, $schema);
+            $files = array_values($widget->content->files)[0] ?? [];
 
-            if (null !== $definition && 'image' === $definition->type && null !== $file) {
-                $fields[$field] = $this->image($file);
+            if (null === $definition || 'image' !== $definition->type) {
+                continue;
+            }
+
+            // "images.#.image" takes every file of the widget, as in a gallery.
+            foreach (str_contains($field, '.#.') ? $files : \array_slice($files, 0, 1) as $index => $file) {
+                if ($file->isImage()) {
+                    self::put($fields, $field, $index + 1, $this->image($file));
+                }
             }
         }
 
@@ -616,6 +652,11 @@ final class Importer
 
         $value = $this->value($content, $old);
 
+        // A plugin of Frootbox 1 shows its own title until a heading is written in its place.
+        if (null === $value && null === $item && 'title' === $old && '' !== trim((string) $this->element?->title)) {
+            $value = trim((string) $this->element?->title);
+        }
+
         if (null === $value && null !== $item) {
             $value = match ($old) {
                 'title' => $item->title,
@@ -632,6 +673,14 @@ final class Importer
     {
         if (isset($content->items[$field])) {
             return array_values(array_filter($content->items[$field], static fn(Item $item): bool => $item->visible));
+        }
+
+        // The public pages below the page, as objects of type Page, e.g. for a sub navigation with images.
+        if ('children' === $field && !isset($content->texts[$field]) && !isset($content->files[$field])) {
+            return array_map(
+                static fn(Page $child): Item => new Item($child->id, 'Page', $child->title, $child->parentId, $child->lft, true, ['redirect' => ['pageId' => (string) $child->id]], $child->content),
+                array_values(array_filter($this->site->children($this->page), static fn(Page $child): bool => 'Public' === $child->visibility)),
+            );
         }
 
         return $content->text($field, $this->language) ?? $content->file($field);
