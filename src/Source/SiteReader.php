@@ -229,6 +229,7 @@ final readonly class SiteReader
                 Row::pathString($config, 'target'),
                 Row::pathString($config, 'seo', 'title'),
                 Row::pathString($config, 'seo', 'description'),
+                Row::int($row, 'pageId'),
             );
         }
 

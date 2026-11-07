@@ -190,8 +190,10 @@ final class Importer
         }
 
         foreach ($this->site->aliases as $alias) {
-            if ('' !== $alias->path && !isset($this->paths[$alias->path]) && isset($this->site->pages[$alias->itemId])) {
-                $this->paths[$alias->path] = $alias->itemId;
+            $page = $alias->page();
+
+            if ('' !== $alias->path && !isset($this->paths[$alias->path]) && null !== $page && isset($this->site->pages[$page])) {
+                $this->paths[$alias->path] = $page;
             }
         }
     }
@@ -227,7 +229,7 @@ final class Importer
 
         // An address that redirects to another one.
         foreach ($this->site->aliases as $alias) {
-            if ($alias->itemId === $target && $alias->isRedirect() && '' !== $alias->target) {
+            if ('Pages' === $alias->owner && $alias->itemId === $target && $alias->isRedirect() && '' !== $alias->target) {
                 return $this->resolve($alias->target, $depth + 1);
             }
         }

@@ -25,7 +25,7 @@ final class OldSite
         'assets' => 'id INTEGER PRIMARY KEY, pageId INT, pluginId INT, parentId INT, orderId INT, className TEXT, uid TEXT, title TEXT, config TEXT, visibility INT',
         'content_elements' => 'id INTEGER PRIMARY KEY, pageId INT, socket TEXT, orderId INT, className TEXT, title TEXT, config TEXT, visibility INT',
         'content_widgets' => 'id INTEGER PRIMARY KEY, className TEXT, config TEXT, textUid TEXT',
-        'aliases' => 'id INTEGER PRIMARY KEY, alias TEXT, itemId INT, itemModel TEXT, language TEXT, status INT, config TEXT',
+        'aliases' => 'id INTEGER PRIMARY KEY, alias TEXT, pageId INT, itemId INT, itemModel TEXT, language TEXT, status INT, config TEXT',
         'navigations' => 'id INTEGER PRIMARY KEY, navId TEXT, title TEXT',
         'navigations_items' => 'id INTEGER PRIMARY KEY, navId INT, parentId INT, orderId INT, title TEXT, className TEXT, config TEXT, visibility INT',
     ];
@@ -93,6 +93,8 @@ final class OldSite
         $connection->insert('persons', ['id' => 1, 'pluginId' => 1, 'pageId' => 1, 'orderId' => 2, 'className' => $contact, 'firstName' => 'Erika', 'lastName' => 'Muster', 'phone' => '0123 45', 'email' => 'erika@example.test', 'position' => 'Leitung', 'title' => '', 'visibility' => 2]);
         $connection->insert('persons', ['id' => 2, 'pluginId' => 1, 'pageId' => 1, 'orderId' => 1, 'className' => $contact, 'firstName' => 'Max', 'lastName' => 'Muster', 'position' => 'Lager', 'visibility' => 2]);
         $connection->insert('persons', ['id' => 3, 'pluginId' => 1, 'pageId' => 1, 'orderId' => 0, 'className' => $contact, 'firstName' => 'Versteckt', 'visibility' => 0]);
+        // The address of Max shows him on the start page; his id is also the one of a page.
+        $connection->insert('aliases', ['alias' => 'team/max-muster', 'pageId' => 1, 'itemId' => 2, 'itemModel' => 'Frootbox\Ext\Core\HelpAndSupport\Persistence\Repositories\Contacts', 'language' => 'de-DE', 'status' => 200, 'config' => '[]']);
         $contacts = 'Frootbox-Ext-Core-HelpAndSupport-Persistence-Repositories-Contacts';
         $connection->insert('files', ['id' => 10, 'orderId' => 2, 'name' => 'alt.jpg', 'type' => 'image/jpeg', 'size' => 10, 'path' => 'uploads/alt.jpg', 'uid' => $contacts . ':1:image']);
         $connection->insert('files', ['id' => 11, 'orderId' => 3, 'name' => 'neu.jpg', 'type' => 'image/jpeg', 'size' => 10, 'path' => 'uploads/neu.jpg', 'uid' => $contacts . ':1:image']);

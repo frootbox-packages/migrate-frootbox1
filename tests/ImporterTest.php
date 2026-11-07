@@ -204,6 +204,13 @@ final class ImporterTest extends TestCase
         self::assertSame('acme/site/Topics', self::at($areas, 'main', 0, 'block'));
     }
 
+    public function testTheOldAddressOfAnObjectLeadsToItsPage(): void
+    {
+        $redirects = array_values(array_filter($this->plan(persons: true)->steps, static fn(array $step): bool => isset($step['redirect.create'])));
+
+        self::assertContains(['redirect.create' => ['path' => '/team/max-muster', 'target' => 'page:${p1.id}']], $redirects, 'Not the page with the id of the contact person.');
+    }
+
     public function testTakesPlainValuesOfAnObject(): void
     {
         $plan = $this->plan(persons: true);

@@ -25,7 +25,20 @@ final readonly class Alias
         /** The title and description for search engines, set in the editor of Frootbox 1. */
         public string $seoTitle = '',
         public string $seoDescription = '',
+        /** The page the address belongs to; for an object the page that shows it. */
+        public int $pageId = 0,
     ) {}
+
+    /**
+     * The page this address leads to: the page itself, or for an object
+     * (a contact person, an article) the page that shows it.
+     */
+    public function page(): ?int
+    {
+        $page = 'Pages' === $this->owner ? $this->itemId : $this->pageId;
+
+        return $page > 0 ? $page : null;
+    }
 
     public function isRedirect(): bool
     {
