@@ -109,6 +109,19 @@ final class ImporterTest extends TestCase
         self::assertContains(['plugin.assign' => ['id' => '${p1.id}', 'type' => 'acme/site/topic']], $both);
     }
 
+    public function testTheBlockOfThePluginBecomesItsView(): void
+    {
+        $steps = $this->plan(teaser: ['block' => 'acme/site/TopicView', 'plugin' => 'acme/site/topic', 'fields' => ['title' => 'title'], 'set' => ['title' => 'Willkommen'], 'options' => ['tag' => 'startseite']])->steps;
+
+        self::assertSame(['acme/site/Topics', 'acme/site/Text'], array_column(self::main($steps[4]), 'block'), 'The view is no block in the area.');
+        $view = self::at($steps[4], 'page.update', 'translations', 'de', 'content', 'plugin');
+        self::assertIsArray($view);
+        self::assertSame('acme/site/TopicView', $view['block']);
+        self::assertSame(['tag' => 'startseite'], $view['options']);
+        self::assertSame('Willkommen', self::at($view, 'fields', 'title'));
+        self::assertContains(['plugin.assign' => ['id' => '${p1.id}', 'type' => 'acme/site/topic']], $steps);
+    }
+
     public function testAPluginNeedsAPlaceInTheLayout(): void
     {
         $plan = $this->plan(teaser: ['plugin' => 'acme/site/topic'], pluginPlace: false);
@@ -301,9 +314,10 @@ final class ImporterTest extends TestCase
             ]),
         ]);
         $banner = self::block('acme/site/Banner', ['image' => new Field('image', 'image', 'Image', optional: true)]);
+        $view = new Component(ComponentKind::Block, 'acme/site/TopicView', '/tmp', 'Topics', '', ['title' => new Field('title', 'headline', 'Title', optional: true)], [], [], plugin: true);
         $images = self::block('acme/site/Gallery', ['items' => new Field('items', 'list', 'Images', fields: ['image' => new Field('image', 'image', 'Image')])]);
         $components = new Components(
-            blocks: ['acme/site/Text' => $text, 'acme/site/Topics' => $topics, 'acme/site/Banner' => $banner, 'acme/site/Gallery' => $images],
+            blocks: ['acme/site/Text' => $text, 'acme/site/Topics' => $topics, 'acme/site/Banner' => $banner, 'acme/site/Gallery' => $images, 'acme/site/TopicView' => $view],
             layouts: ['acme/site/Page' => new Component(ComponentKind::Layout, 'acme/site/Page', '/tmp', 'Page', '', [], [], [], plugin: $pluginPlace)],
         );
         $mapping = Mapping::fromArray([

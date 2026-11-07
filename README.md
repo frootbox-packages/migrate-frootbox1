@@ -81,7 +81,10 @@ give their title, their linked page and plain values such as the
 `position` of a contact person; the contact persons of a plugin are the
 list `persons`. A plugin with `plugin:` makes its page show that plugin
 of Frootbox 2 in its default space, after the content; with `block:` as
-well, its texts also become that block. The layout of the page needs a
+well, its texts also become that block. When `block:` names the block
+of the plugin itself (one with `plugin: true`, e.g.
+`frootbox/shop/Catalog`), it becomes the view of the plugin with its
+fields and options instead of a block in the area. The layout of the page needs a
 place for a plugin. Of several files in one field the import takes the one
 Frootbox 1 shows. Each value is converted by the type
 of the target field: HTML becomes rich text, links to old pages and

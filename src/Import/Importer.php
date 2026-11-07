@@ -78,6 +78,9 @@ final class Importer
     /** @var array<int, string> Page of Frootbox 1 → the plugin of Frootbox 2 it shows */
     private array $plugins = [];
 
+    /** @var array<int, array<string, mixed>> Page of Frootbox 1 → the view of its plugin with fields and options */
+    private array $views = [];
+
     private string $language = '';
 
     private string $code = '';
@@ -150,6 +153,11 @@ final class Importer
             if (isset($this->created[$page->id])) {
                 $layout = $this->mapping->layouts['' === $page->view() ? 'Default' : $page->view()];
                 $translation = ['content' => ['areas' => $this->content($page, $layout['area'])]];
+
+                if (isset($this->views[$page->id])) {
+                    $translation['content']['plugin'] = $this->views[$page->id];
+                }
+
                 [$seoTitle, $description] = $this->seo($page);
 
                 if ('' !== $description) {
@@ -385,6 +393,15 @@ final class Importer
             }
 
             $block = $this->block($rule, $part->content, $part->config, $isElement ? $part : null);
+
+            // The block of the plugin itself is its view, with fields and options (decision 0320).
+            if (null !== $block && null !== $rule->plugin && true === $this->components->block($rule->block)?->plugin) {
+                if (($this->plugins[$page->id] ?? null) === $rule->plugin) {
+                    $this->views[$page->id] = $block;
+                }
+
+                continue;
+            }
 
             if (null !== $block) {
                 $blocks[] = $block;
