@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace Frootbox\MigrateFrootbox1\Mapping;
 
 use Frootbox\MigrateFrootbox1\Source\Row;
+use Normalizer;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
@@ -31,15 +32,21 @@ use Symfony\Component\Yaml\Yaml;
  *           text-#: columns.#.body        # numbered fields into a list
  *           image: false
  *         set: { signature: 'Dr. Example' }
- *         widgets: { Core/Images/Thumbnail: image }
+ *         widgets: { Core/Images/Thumbnail: image, Core/Video/Video: true }   # true: only for "{widget.x}"
  *     plugins:
  *       Core/Navigation/Teaser@Index06: { block: …, fields: { items.1.background: image } }
  *       Core/ContactForms/FormTeaser@Index01: { block: frootbox/forms/Form, form: true }
+ *       145: { block: acme/theme/Video }     # this one plugin by its ID, before the rule of its type
  *       Core/News/Archive@Index01: { plugin: frootbox/news/article }   # the page shows the plugin
  *     items:
  *       Teaser: { fields: { title: title, text: text, link: { to: link, text: More } } }
- *     navigations: { BannerMain: main }
+ *     navigations:
+ *       BannerMain: main                  # a navigation of Frootbox 1: one of Frootbox 2
+ *       footer:                           # or the items of a navigation of Frootbox 2
+ *         - { type: target, target: '{page:2}' }
+ *         - { type: pages, target: '{page:3}', depth: 1 }
  *     pages: { 12: { title: My account } }  # a new title by the ID in Frootbox 1, the address stays
+ *     content: [1, 5]                     # only these pages get their content, the others come empty
  *     site:
  *       fields: { brand: Example, contact: { target: '{page:5}', text: Contact } }
  *     media:                              # by the file name in Frootbox 1
@@ -73,6 +80,8 @@ final readonly class Mapping
      * @param Rule|null                  $page        A block at the top of every page from the fields of the page itself, e.g. its background image
      * @param string|null                $pageArea    The area of the layout for that block, null for the top of the main area
      * @param array<int, string>         $titles      New titles of pages by their ID in Frootbox 1, the address stays
+     * @param list<int>|null             $content     The pages by their ID in Frootbox 1 that get their content, null for all; the others come with title and address only
+     * @param array<string, list<array<string, mixed>>> $menus Items of navigations of Frootbox 2 by their name, for those Frootbox 1 built from the page tree
      */
     public function __construct(
         public array $languages,
@@ -87,7 +96,28 @@ final readonly class Mapping
         public ?Rule $page = null,
         public ?string $pageArea = null,
         public array $titles = [],
+        public ?array $content = null,
+        public array $menus = [],
     ) {}
+
+    /**
+     * The texts the mapping gives a file of Frootbox 1, by its name in any
+     * form of Unicode: names uploaded from a Mac keep "ä" as "a" and two dots.
+     *
+     * @return array{alt?: string, copyright?: string}
+     */
+    public function textsOf(string $name): array
+    {
+        return $this->media[self::normalized($name)] ?? [];
+    }
+
+    /**
+     * Whether the page of Frootbox 1 gets its content, by "content".
+     */
+    public function takesContentOf(int $page): bool
+    {
+        return null === $this->content || \in_array($page, $this->content, true);
+    }
 
     /**
      * @throws MappingException
@@ -152,7 +182,16 @@ final readonly class Mapping
 
         $navigations = [];
 
+        $menus = [];
+
         foreach (Row::map($data['navigations'] ?? []) as $old => $new) {
+            // A list is no navigation of Frootbox 1 but the items of one of Frootbox 2.
+            if (\is_array($new) && array_is_list($new)) {
+                $menus[$old] = array_map(Row::map(...), $new);
+
+                continue;
+            }
+
             $navigations[$old] = false === $new ? null : self::name($new, 'navigations.' . $old);
         }
 
@@ -161,7 +200,7 @@ final readonly class Mapping
         $media = [];
 
         foreach (Row::map($data['media'] ?? []) as $name => $texts) {
-            $media[$name] = array_filter(
+            $media[self::normalized($name)] = array_filter(
                 array_intersect_key(array_map(static fn(mixed $text): string => \is_string($text) ? trim($text) : '', Row::map($texts)), ['alt' => true, 'copyright' => true]),
                 static fn(string $text): bool => '' !== $text,
             );
@@ -189,7 +228,24 @@ final readonly class Mapping
             $titles[$id] = trim($title);
         }
 
-        return new self($languages, $domains, $layouts, $blocks, $plugins, $items, $navigations, Row::map(Row::map($data['site'] ?? [])['fields'] ?? []), $media, $page, $pageArea, $titles);
+        $content = null;
+
+        if (\array_key_exists('content', $data)) {
+            $ids = \is_array($data['content']) && array_is_list($data['content']) ? $data['content'] : [null];
+            $content = [];
+
+            foreach ($ids as $id) {
+                if (!\is_int($id) || $id < 1) {
+                    throw new MappingException('content must list the IDs of the pages in Frootbox 1 that get their content, e.g. "content: [1, 5]".');
+                }
+
+                $content[$id] = $id;
+            }
+
+            $content = array_values($content);
+        }
+
+        return new self($languages, $domains, $layouts, $blocks, $plugins, $items, $navigations, Row::map(Row::map($data['site'] ?? [])['fields'] ?? []), $media, $page, $pageArea, $titles, $content, $menus);
     }
 
     /**
@@ -227,7 +283,12 @@ final readonly class Mapping
         $widgets = [];
 
         foreach (Row::map($rule['widgets'] ?? []) as $type => $field) {
-            $widgets[$type] = false === $field ? null : self::name($field, $where . '.widgets.' . $type);
+            // true takes a widget without a file, e.g. a video, only for "{widget.x}".
+            $widgets[$type] = match ($field) {
+                false => null,
+                true => '',
+                default => self::name($field, $where . '.widgets.' . $type),
+            };
         }
 
         return new Rule(
@@ -240,6 +301,13 @@ final readonly class Mapping
             true === ($rule['form'] ?? false),
             $plugin,
         );
+    }
+
+    private static function normalized(string $name): string
+    {
+        $normalized = Normalizer::normalize($name, Normalizer::FORM_C);
+
+        return \is_string($normalized) ? $normalized : $name;
     }
 
     /**

@@ -152,7 +152,14 @@ final class Importer
         foreach ($pages as $page) {
             if (isset($this->created[$page->id])) {
                 $layout = $this->mapping->layouts['' === $page->view() ? 'Default' : $page->view()];
-                $translation = ['content' => ['areas' => $this->content($page, $layout['area'])]];
+                $translation = [];
+
+                // A website can come over page by page: the others keep their place in the tree.
+                if ($this->mapping->takesContentOf($page->id)) {
+                    $translation['content'] = ['areas' => $this->content($page, $layout['area'])];
+                } else {
+                    $this->note(\sprintf('Page %d "%s" comes without content: the mapping takes it only from the pages under "content".', $page->id, $page->title));
+                }
 
                 if (isset($this->views[$page->id])) {
                     $translation['content']['plugin'] = $this->views[$page->id];
@@ -168,12 +175,16 @@ final class Importer
                     $translation['seoTitle'] = $seoTitle;
                 }
 
-                $content[] = ['page.update' => array_filter([
+                $update = array_filter([
                     'id' => $this->ref($page->id),
                     'excludeFromSearchEngines' => $page->excludedFromSearchEngines() ? Reach::Page->value : null,
                     'excludeFromSiteSearch' => $page->excludedFromSiteSearch() ? Reach::Page->value : null,
-                    'translations' => [$this->code => $translation],
-                ], static fn(mixed $value): bool => null !== $value)];
+                    'translations' => [] === $translation ? null : [$this->code => $translation],
+                ], static fn(mixed $value): bool => null !== $value);
+
+                if (\count($update) > 1) {
+                    $content[] = ['page.update' => $update];
+                }
             }
         }
 
@@ -371,6 +382,8 @@ final class Importer
             }
 
             $rules = $isElement ? $this->mapping->plugins : $this->mapping->blocks;
+            // The ID of one plugin or block goes before the rule of its type.
+            $key = \array_key_exists((string) $part->id, $rules) ? (string) $part->id : $key;
 
             if (!\array_key_exists($key, $rules)) {
                 $this->note($this->where . ' is left out: the mapping does not name it.');
@@ -606,7 +619,7 @@ final class Importer
         if (null === $value && null !== $item) {
             $value = match ($old) {
                 'title' => $item->title,
-                'link' => $item->linkedPage(),
+                'link' => $item->link(),
                 // A plain value of the object, e.g. the position of a contact person.
                 default => \is_string($item->config[$old] ?? null) && '' !== $item->config[$old] ? $item->config[$old] : null,
             };
@@ -725,6 +738,18 @@ final class Importer
             };
         }
 
+        if (\is_string($value) && 'link' === $field->type) {
+            $href = $this->link($value);
+
+            if (str_starts_with($href, 'page:')) {
+                $page = $this->resolve($this->paths[trim($value, '/')] ?? 0);
+
+                return ['target' => $href, 'text' => $target->text ?? (null === $page ? $value : $this->site->pages[$page]->title)];
+            }
+
+            return 1 === preg_match('#^(https?|mailto|tel):#i', $href) ? ['url' => $href, 'text' => $target->text ?? $href] : $this->skip($field, 'a link to ' . $value);
+        }
+
         if (\is_string($value)) {
             return match ($field->type) {
                 'headline', 'text' => $value,
@@ -837,7 +862,8 @@ final class Importer
                 $field = null === $widget ? null : ($rule->widgets[$widget->type()] ?? null);
                 $file = null === $widget ? null : (array_values($widget->content->files)[0][0] ?? null);
 
-                if (null !== $field && null !== $file && !isset($widgets[$field])) {
+                // An image needs its file, a widget only for "{widget.x}" (field '') does not.
+                if (null !== $field && (null !== $file || '' === $field) && !isset($widgets[$field])) {
                     $widgets[$field] = $widget;
                 }
             }
@@ -905,8 +931,9 @@ final class Importer
             }
 
             // The mapping fills in what the file lacks in Frootbox 1.
-            $alt = '' === $file->title ? $this->mapping->media[$file->name]['alt'] ?? '' : $file->title;
-            $copyright = '' === $file->copyright ? $this->mapping->media[$file->name]['copyright'] ?? '' : $file->copyright;
+            $texts = $this->mapping->textsOf($file->name);
+            $alt = '' === $file->title ? $texts['alt'] ?? '' : $file->title;
+            $copyright = '' === $file->copyright ? $texts['copyright'] ?? '' : $file->copyright;
             $this->files[$target] = $source;
             $this->media[] = ['upload' => ['file' => $target], 'as' => 'u' . $file->id];
             $this->media[] = [
@@ -1069,6 +1096,11 @@ final class Importer
             $steps[] = ['navigation.update' => ['name' => $name, 'items' => [$this->code => $items]]];
         }
 
+        foreach ($this->mapping->menus as $name => $items) {
+            $this->where = \sprintf('Navigation "%s" of the mapping', $name);
+            $steps[] = ['navigation.update' => ['name' => $name, 'items' => [$this->code => array_values($this->placeholders(Row::map($items), []))]]];
+        }
+
         return $steps;
     }
 
@@ -1173,7 +1205,7 @@ final class Importer
         }
 
         $steps[] = ['page.publish' => ['ids' => array_map($this->ref(...), array_keys($this->created))]];
-        $names = array_values(array_filter($this->mapping->navigations, is_string(...)));
+        $names = array_values(array_unique([...array_filter($this->mapping->navigations, is_string(...)), ...array_keys($this->mapping->menus)]));
 
         if ([] !== $names) {
             $steps[] = ['navigation.publish' => ['names' => $names]];

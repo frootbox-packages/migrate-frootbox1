@@ -18,6 +18,8 @@ use Frootbox\MigrateFrootbox1\Mapping\Mapping;
 use Frootbox\MigrateFrootbox1\Mapping\MappingException;
 use Frootbox\MigrateFrootbox1\Mapping\Rule;
 use Frootbox\MigrateFrootbox1\Mapping\Target;
+use Frootbox\MigrateFrootbox1\Source\Content;
+use Frootbox\MigrateFrootbox1\Source\Item;
 use Frootbox\MigrateFrootbox1\Source\SiteReader;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -205,6 +207,36 @@ final class ImporterTest extends TestCase
         self::assertSame(['title' => 'Wir', 'slug' => 'ueber-uns'], self::at($plan->steps[3], 'page.create', 'translations', 'de'));
     }
 
+    public function testTakesTheContentOnlyOfTheListedPages(): void
+    {
+        $plan = $this->plan(content: [2]);
+        $updates = array_values(array_filter($plan->steps, static fn(array $step): bool => isset($step['page.update'])));
+
+        self::assertSame(['${p2.id}'], array_map(static fn(array $step): mixed => self::at($step, 'page.update', 'id'), $updates), 'The start page has nothing else to change.');
+        self::assertSame(['page.create', 'page.create'], array_values(array_filter(array_map(static fn(array $step): string => (string) array_key_first($step), $plan->steps), static fn(string $step): bool => 'page.create' === $step)), 'Both pages keep their place.');
+        self::assertContains('Page 1 "Start" comes without content: the mapping takes it only from the pages under "content".', $plan->report);
+    }
+
+    public function testTheMappingWritesANavigationFrootbox1BuiltFromThePageTree(): void
+    {
+        $plan = $this->plan(true, menus: ['footer' => [['type' => 'target', 'target' => '{page:2}', 'label' => 'Wir'], ['type' => 'pages', 'target' => '{page:1}', 'depth' => 1]]]);
+        $footer = array_values(array_filter($plan->steps, static fn(array $step): bool => 'footer' === self::at($step, 'navigation.update', 'name')));
+
+        self::assertSame([['navigation.update' => ['name' => 'footer', 'items' => ['de' => [
+            ['type' => 'target', 'target' => 'page:${p2.id}', 'label' => 'Wir'],
+            ['type' => 'pages', 'target' => 'page:${p1.id}', 'depth' => 1],
+        ]]]]], $footer);
+        self::assertContains(['navigation.publish' => ['names' => ['main', 'footer']]], $plan->steps, 'Published with the others.');
+    }
+
+    public function testRejectsContentThatIsNoListOfPages(): void
+    {
+        $this->expectException(MappingException::class);
+        $this->expectExceptionMessage('content must list the IDs of the pages');
+
+        Mapping::fromArray(['languages' => ['de-DE' => 'de'], 'content' => ['start']]);
+    }
+
     public function testPutsTheBlockFromThePageIntoItsOwnArea(): void
     {
         $plan = $this->plan(page: ['block' => 'acme/site/Banner', 'area' => 'head']);
@@ -248,12 +280,46 @@ final class ImporterTest extends TestCase
         self::assertSame(['image' => 'aside', 'imageWidth' => 6], self::at($text, 'options'), 'The widget sits on the right with 6 of 12 columns.');
     }
 
+    public function testTheIdOfABlockGoesBeforeItsType(): void
+    {
+        $plan = $this->plan(blocks: [1 => ['block' => 'acme/site/Banner', 'fields' => ['title' => false, 'text-#' => false]]]);
+        $start = self::main(array_values(array_filter($plan->steps, static fn(array $step): bool => '${p1.id}' === self::at($step, 'page.update', 'id')))[0]);
+
+        self::assertSame(['acme/site/Topics', 'acme/site/Banner'], array_column($start, 'block'), 'Block 1, a Text, becomes the banner.');
+    }
+
+    public function testAnObjectLinksToAnAddressOrAnotherWebsite(): void
+    {
+        $item = static fn(array $redirect, bool $off = false): Item => new Item(1, 'Frootbox\Ext\Core\Navigation\Plugins\Teaser\Persistence\Teaser', 'Eins', 0, 0, true, ['redirect' => $redirect, 'linkageDeactivated' => $off], new Content());
+
+        self::assertSame(2, $item(['pageId' => '2', 'intern' => 'alt'])->link());
+        self::assertSame('/ueber-uns', $item(['target' => '', 'intern' => 'ueber-uns'])->link());
+        self::assertSame('https://www.borkum.de/', $item(['target' => 'https://www.borkum.de/', 'intern' => ''])->link());
+        self::assertNull($item(['intern' => 'ueber-uns'], true)->link(), 'Switched off in Frootbox 1.');
+    }
+
+    public function testAWidgetCanGiveOnlyItsValues(): void
+    {
+        $plan = $this->plan(textOptions: ['align' => '{widget.align}'], widgets: ['Core/Images/Thumbnail' => true]);
+        $text = self::main($plan->steps[2])[1] ?? null;
+
+        self::assertSame(['align' => 'right'], self::at($text, 'options'), 'As for a video, which has no file.');
+        self::assertNull(self::at($text, 'fields', 'image'));
+    }
+
     public function testTheMappingFillsInWhatAFileLacks(): void
     {
         $plan = $this->plan(media: ['team.jpg' => ['alt' => 'Das Team vor der Praxis', 'copyright' => 'Max Muster']]);
 
         self::assertSame(['upload' => '${u1.token}', 'copyright' => '© Jane', 'texts' => ['de' => ['alt' => 'Das Team vor der Praxis']]], $plan->steps[1]['media.create'], 'The copyright of Frootbox 1 wins, the alt text comes from the mapping.');
         self::assertNotContains('The image team.jpg has no description (alt text) yet; the mapping can give it one under media.', $plan->report);
+    }
+
+    public function testFindsTheTextsOfAFileInAnyFormOfUnicode(): void
+    {
+        $mapping = Mapping::fromArray(['languages' => ['de-DE' => 'de'], 'media' => ["f\u{e4}hre.png" => ['alt' => 'Eine Fähre']]]);
+
+        self::assertSame(['alt' => 'Eine Fähre'], $mapping->textsOf("fa\u{308}hre.png"), 'The name as a Mac uploads it.');
     }
 
     public function testRejectsAMappingThatIsNotFilledIn(): void
@@ -298,8 +364,12 @@ final class ImporterTest extends TestCase
      * @param array<int, array<string, string>>   $pages
      * @param array<string, mixed>                $textOptions
      * @param array<string, mixed>|null           $teaser      The rule for the plugin Teaser instead of the usual one
+     * @param list<int>|null                      $content     The pages that get their content
+     * @param array<string, list<array<string, mixed>>> $menus Navigations of Frootbox 2 written by the mapping
+     * @param array<string, string|bool>          $widgets     Widgets in the text of the block Text
+     * @param array<int, mixed>                   $blocks      Rules for single blocks by their ID
      */
-    private function plan(bool $publish = false, array $media = [], ?array $page = null, array $pages = [], bool $persons = false, bool $gallery = false, array $textOptions = [], ?array $teaser = null, bool $pluginPlace = true): Plan
+    private function plan(bool $publish = false, array $media = [], ?array $page = null, array $pages = [], bool $persons = false, bool $gallery = false, array $textOptions = [], ?array $teaser = null, bool $pluginPlace = true, ?array $content = null, array $menus = [], array $widgets = ['Core/Images/Thumbnail' => 'image'], array $blocks = []): Plan
     {
         $text = self::block('acme/site/Text', [
             'title' => new Field('title', 'headline', 'Title', optional: true),
@@ -324,8 +394,9 @@ final class ImporterTest extends TestCase
             'languages' => ['de-DE' => 'de'],
             'domains' => ['www.example.com'],
             'layouts' => ['Default' => 'acme/site/Page'],
-            'blocks' => [
-                'Text' => ['block' => 'acme/site/Text', 'fields' => ['title' => 'title', 'text-#' => 'columns.#.body'], 'widgets' => ['Core/Images/Thumbnail' => 'image'], 'options' => $textOptions],
+            // + keeps the IDs as keys, spreading would number them anew.
+            'blocks' => $blocks + [
+                'Text' => ['block' => 'acme/site/Text', 'fields' => ['title' => 'title', 'text-#' => 'columns.#.body'], 'widgets' => $widgets, 'options' => $textOptions],
                 'Teaser1' => ['block' => 'acme/site/Topics', 'fields' => ['title' => 'title', 'teasers' => 'items']],
                 'Gallery' => $gallery ? ['block' => 'acme/site/Gallery', 'fields' => ['images' => 'items.#.image']] : false,
             ],
@@ -334,11 +405,12 @@ final class ImporterTest extends TestCase
                 'Teaser' => ['fields' => ['title' => 'title', 'link' => ['to' => 'link', 'text' => 'Mehr'], 'background' => false]],
                 'Contact' => ['fields' => ['position' => 'title', 'image' => false]],
             ],
-            'navigations' => ['Main' => 'main'],
+            'navigations' => ['Main' => 'main', ...$menus],
             'site' => ['fields' => ['brand' => 'Acme', 'contact' => ['target' => '{page:2}', 'text' => 'Kontakt']]],
             'media' => $media,
             ...(null === $page ? [] : ['page' => $page]),
             ...([] === $pages ? [] : ['pages' => $pages]),
+            ...(null === $content ? [] : ['content' => $content]),
         ]);
 
         $old = OldSite::create();

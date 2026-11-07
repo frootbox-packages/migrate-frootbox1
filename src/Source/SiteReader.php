@@ -152,7 +152,8 @@ final readonly class SiteReader
             );
         }
 
-        foreach ($this->rows('SELECT * FROM content_elements ORDER BY orderId, id') as $row) {
+        // Frootbox 1 shows the plugins of a socket by orderId, highest first (index.php).
+        foreach ($this->rows('SELECT * FROM content_elements ORDER BY orderId DESC, id') as $row) {
             $page = $pages[Row::int($row, 'pageId')] ?? null;
 
             if (null === $page) {

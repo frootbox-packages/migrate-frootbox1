@@ -52,6 +52,7 @@ blocks:
 plugins:
   Core/Navigation/Teaser@Index06: { block: acme/theme/Stage, fields: { items.1.background: image } }
   Core/ContactForms/FormTeaser@Index01: { block: frootbox/forms/Form, form: true }
+  145: { block: frootbox/theme-base/VideoEmbed }  # one plugin by its ID, before the rule of its type
   Core/FileManager/CopyrightFilesList@Index01: { block: frootbox/theme-base/ImageCredits }
   Core/HelpAndSupport/ContactPersons@Index01: { block: acme/theme/Team, fields: { persons: people } }
   Core/News/Archive@Index01: { plugin: frootbox/news/article }  # the page shows the plugin
@@ -64,8 +65,13 @@ page:                               # fields of the page itself, as a block on t
   fields: { background: image }
   options:
     height: { value: '{config.variables.bannerStyle}', map: { big-header: large, small-header: small } }
-navigations: { BannerMain: main }
+navigations:
+  BannerMain: main                  # a navigation of Frootbox 1: one of Frootbox 2
+  footer:                           # or the items of one of Frootbox 2, e.g. where
+    - { type: target, target: '{page:2}' }   # Frootbox 1 showed the page tree
+    - { type: pages, target: '{page:3}', depth: 1 }
 pages: { 12: { title: My account } }  # a new title by the ID in Frootbox 1, the address stays
+content: [1]                        # only these pages get their content so far
 site:
   fields: { brand: Example, contact: { target: '{page:5}', text: Contact } }
 media:                              # by the file name in Frootbox 1
@@ -75,7 +81,9 @@ media:                              # by the file name in Frootbox 1
 `{page:5}` is the new page of page 5 in Frootbox 1, `{config.x}` a value
 in the configuration of the old block (or page), `{widget.x}` one of the
 first image the block takes from its text, e.g. `{widget.align}` or
-`{widget.width}` (of 12 columns). `{ value: …, map: … }`
+`{widget.width}` (of 12 columns). A widget without a file, e.g. a video,
+gives only these values with `widgets: { Core/Video/Video: true }`, e.g.
+`{widget.url}` as the address of a video block. `{ value: …, map: … }`
 translates such a value; an option without a value is left out. Objects
 give their title, their linked page and plain values such as the
 `position` of a contact person; the contact persons of a plugin are the
@@ -90,7 +98,9 @@ Frootbox 1 shows. Each value is converted by the type
 of the target field: HTML becomes rich text, links to old pages and
 aliases become links to the new pages, files become media.
 Under `media` the mapping fills in an alt text or a copyright that a file
-lacks in Frootbox 1.
+lacks in Frootbox 1. To move a website page by page, `content` lists the
+IDs of the pages that get their content; every other page comes with its
+title and address only, so navigations, links and redirects already hold.
 
 ## Import
 

@@ -126,7 +126,7 @@ final class Analyzer
                 ++$nested->count;
                 self::fields($nested, $item->content, $items);
 
-                if (null !== $item->linkedPage()) {
+                if (null !== $item->link()) {
                     $nested->field('link', 'page');
                 }
 
