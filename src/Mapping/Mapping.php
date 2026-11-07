@@ -39,12 +39,14 @@ use Symfony\Component\Yaml\Yaml;
  *     items:
  *       Teaser: { fields: { title: title, text: text, link: { to: link, text: More } } }
  *     navigations: { BannerMain: main }
+ *     pages: { 12: { title: My account } }  # a new title by the ID in Frootbox 1, the address stays
  *     site:
  *       fields: { brand: Example, contact: { target: '{page:5}', text: Contact } }
  *     media:                              # by the file name in Frootbox 1
  *       team.jpg: { alt: 'The team in front of the practice', copyright: 'Jane Doe' }
  *     page:                               # fields of the page itself, as a block at its top
  *       block: acme/theme/Banner
+ *       area: head                        # optional: its own area of the layout instead of the top of main
  *       fields: { background: image }
  *       options:
  *         height: { value: '{config.variables.bannerStyle}', map: { big-header: large, small-header: small } }
@@ -69,6 +71,8 @@ final readonly class Mapping
      * @param array<string, mixed>       $site        Fields of the website
      * @param array<string, array{alt?: string, copyright?: string}> $media Texts of files by their name in Frootbox 1, where they lack them
      * @param Rule|null                  $page        A block at the top of every page from the fields of the page itself, e.g. its background image
+     * @param string|null                $pageArea    The area of the layout for that block, null for the top of the main area
+     * @param array<int, string>         $titles      New titles of pages by their ID in Frootbox 1, the address stays
      */
     public function __construct(
         public array $languages,
@@ -81,6 +85,8 @@ final readonly class Mapping
         public array $site,
         public array $media = [],
         public ?Rule $page = null,
+        public ?string $pageArea = null,
+        public array $titles = [],
     ) {}
 
     /**
@@ -162,8 +168,28 @@ final readonly class Mapping
         }
 
         $page = isset($data['page']) ? self::rule($data['page'], 'page') : null;
+        $pageArea = Row::map($data['page'] ?? [])['area'] ?? null;
 
-        return new self($languages, $domains, $layouts, $blocks, $plugins, $items, $navigations, Row::map(Row::map($data['site'] ?? [])['fields'] ?? []), $media, $page);
+        if (null !== $pageArea && (!\is_string($pageArea) || '' === $pageArea)) {
+            throw new MappingException('page.area must be the name of an area of the layouts, e.g. "head".');
+        }
+
+        $titles = [];
+
+        $pages = $data['pages'] ?? [];
+
+        // PHP keeps numeric keys as integers.
+        foreach (\is_array($pages) ? $pages : [] as $id => $settings) {
+            $title = Row::map($settings)['title'] ?? null;
+
+            if (!\is_int($id) || $id < 1 || !\is_string($title) || '' === trim($title)) {
+                throw new MappingException(\sprintf('pages.%s needs the ID of a page in Frootbox 1 and a title, e.g. "pages: { 12: { title: My account } }".', $id));
+            }
+
+            $titles[$id] = trim($title);
+        }
+
+        return new self($languages, $domains, $layouts, $blocks, $plugins, $items, $navigations, Row::map(Row::map($data['site'] ?? [])['fields'] ?? []), $media, $page, $pageArea, $titles);
     }
 
     /**

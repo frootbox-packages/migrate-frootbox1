@@ -185,6 +185,25 @@ final class ImporterTest extends TestCase
         self::assertNotContains('Page 1 "Start": the field "background" of the page is left out, the mapping has no "page".', $plan->report);
     }
 
+    public function testGivesAPageANewTitleAndKeepsItsAddress(): void
+    {
+        $plan = $this->plan(pages: [2 => ['title' => 'Wir']]);
+
+        self::assertSame(['title' => 'Wir', 'slug' => 'ueber-uns'], self::at($plan->steps[3], 'page.create', 'translations', 'de'));
+    }
+
+    public function testPutsTheBlockFromThePageIntoItsOwnArea(): void
+    {
+        $plan = $this->plan(page: ['block' => 'acme/site/Banner', 'area' => 'head']);
+        $start = array_values(array_filter($plan->steps, static fn(array $step): bool => '${p1.id}' === self::at($step, 'page.update', 'id')))[0];
+        $areas = self::at($start, 'page.update', 'translations', 'de', 'content', 'areas');
+
+        self::assertIsArray($areas);
+        self::assertSame(['head', 'main'], array_keys($areas));
+        self::assertSame([['block' => 'acme/site/Banner', 'fields' => []]], $areas['head']);
+        self::assertSame('acme/site/Topics', self::at($areas, 'main', 0, 'block'));
+    }
+
     public function testTakesPlainValuesOfAnObject(): void
     {
         $plan = $this->plan(persons: true);
@@ -256,10 +275,11 @@ final class ImporterTest extends TestCase
     /**
      * @param array<string, array<string, string>> $media
      * @param array<string, mixed>|null           $page
+     * @param array<int, array<string, string>>   $pages
      * @param array<string, mixed>                $textOptions
      * @param array<string, mixed>|null           $teaser      The rule for the plugin Teaser instead of the usual one
      */
-    private function plan(bool $publish = false, array $media = [], ?array $page = null, bool $persons = false, bool $gallery = false, array $textOptions = [], ?array $teaser = null, bool $pluginPlace = true): Plan
+    private function plan(bool $publish = false, array $media = [], ?array $page = null, array $pages = [], bool $persons = false, bool $gallery = false, array $textOptions = [], ?array $teaser = null, bool $pluginPlace = true): Plan
     {
         $text = self::block('acme/site/Text', [
             'title' => new Field('title', 'headline', 'Title', optional: true),
@@ -297,6 +317,7 @@ final class ImporterTest extends TestCase
             'site' => ['fields' => ['brand' => 'Acme', 'contact' => ['target' => '{page:2}', 'text' => 'Kontakt']]],
             'media' => $media,
             ...(null === $page ? [] : ['page' => $page]),
+            ...([] === $pages ? [] : ['pages' => $pages]),
         ]);
 
         $old = OldSite::create();

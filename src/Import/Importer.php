@@ -129,7 +129,7 @@ final class Importer
                 continue;
             }
 
-            $translation = ['title' => $page->title];
+            $translation = ['title' => $this->mapping->titles[$page->id] ?? $page->title];
 
             if (!$page->isRoot()) {
                 $translation['slug'] = $page->slug();
@@ -149,8 +149,7 @@ final class Importer
         foreach ($pages as $page) {
             if (isset($this->created[$page->id])) {
                 $layout = $this->mapping->layouts['' === $page->view() ? 'Default' : $page->view()];
-                $blocks = $this->content($page);
-                $translation = ['content' => ['areas' => [$layout['area'] => $blocks]]];
+                $translation = ['content' => ['areas' => $this->content($page, $layout['area'])]];
                 [$seoTitle, $description] = $this->seo($page);
 
                 if ('' !== $description) {
@@ -317,13 +316,16 @@ final class Importer
     }
 
     /**
-     * The blocks of a page: plugins above the content, the blocks, the
-     * plugins of the content, then the blocks below.
+     * The blocks of a page by area: plugins above the content, the blocks,
+     * the plugins of the content, then the blocks below. The block from the
+     * page itself comes first, or into its own area when the mapping says so.
      *
-     * @return list<array<string, mixed>>
+     * @return array<string, list<array<string, mixed>>>
      */
-    private function content(Page $page): array
+    private function content(Page $page, string $area): array
     {
+        $areas = [];
+
         $first = array_filter($page->elements, static fn(Element $element): bool => 'MainContent' !== $element->socket);
         $main = array_filter($page->elements, static fn(Element $element): bool => 'MainContent' === $element->socket);
         $above = $page->blocksIn('block-content');
@@ -334,7 +336,9 @@ final class Importer
         if (null !== $this->mapping->page) {
             $block = $this->block($this->mapping->page, $page->content, $page->config, null);
 
-            if (null !== $block) {
+            if (null !== $block && null !== $this->mapping->pageArea && $area !== $this->mapping->pageArea) {
+                $areas[$this->mapping->pageArea] = [$block];
+            } elseif (null !== $block) {
                 $blocks[] = $block;
             }
         } else {
@@ -385,7 +389,7 @@ final class Importer
             }
         }
 
-        return $blocks;
+        return $areas + [$area => $blocks];
     }
 
     /**

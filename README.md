@@ -60,10 +60,12 @@ items:
   Contact: { fields: { title: name, position: role, phone: phone, email: email, image: image } }
 page:                               # fields of the page itself, as a block on top
   block: acme/theme/Banner
+  area: head                        # optional: an area of its own instead of the top of main
   fields: { background: image }
   options:
     height: { value: '{config.variables.bannerStyle}', map: { big-header: large, small-header: small } }
 navigations: { BannerMain: main }
+pages: { 12: { title: My account } }  # a new title by the ID in Frootbox 1, the address stays
 site:
   fields: { brand: Example, contact: { target: '{page:5}', text: Contact } }
 media:                              # by the file name in Frootbox 1
