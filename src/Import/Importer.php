@@ -483,7 +483,7 @@ final class Importer
         if ($many && isset($content->files[$old])) {
             $found = [];
 
-            foreach (array_values($content->files[$old]) as $index => $file) {
+            foreach ($content->files[$old] as $index => $file) {
                 $found[] = [$index + 1, $old, $file];
             }
 
