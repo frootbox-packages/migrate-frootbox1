@@ -427,6 +427,14 @@ final class Importer
             if (null !== $block) {
                 $blocks[] = $block;
             }
+
+            foreach ($rule->then as $next) {
+                $further = $this->block($next, $part->content, $part->config, $isElement ? $part : null);
+
+                if (null !== $further) {
+                    $blocks[] = $further;
+                }
+            }
         }
 
         return $areas + [$area => $blocks];

@@ -288,6 +288,18 @@ final class ImporterTest extends TestCase
         self::assertSame(['acme/site/Topics', 'acme/site/Banner'], array_column($start, 'block'), 'Block 1, a Text, becomes the banner.');
     }
 
+    public function testABlockCanBecomeSeveral(): void
+    {
+        $plan = $this->plan(blocks: [1 => ['block' => 'acme/site/Banner', 'fields' => ['title' => false, 'text-#' => false], 'then' => [
+            ['block' => 'acme/site/Text', 'fields' => ['title' => 'title', 'text-#' => false], 'widgets' => ['Core/Images/Thumbnail' => false]],
+            false,
+        ]]]);
+        $start = self::main(array_values(array_filter($plan->steps, static fn(array $step): bool => '${p1.id}' === self::at($step, 'page.update', 'id')))[0]);
+
+        self::assertSame(['acme/site/Topics', 'acme/site/Banner', 'acme/site/Text'], array_column($start, 'block'), 'The further block right after the first.');
+        self::assertSame('Willkommen', self::at($start[2], 'fields', 'title'), 'With the fields of the same block.');
+    }
+
     public function testAnObjectLinksToAnAddressOrAnotherWebsite(): void
     {
         $item = static fn(array $redirect, bool $off = false): Item => new Item(1, 'Frootbox\Ext\Core\Navigation\Plugins\Teaser\Persistence\Teaser', 'Eins', 0, 0, true, ['redirect' => $redirect, 'linkageDeactivated' => $off], new Content());

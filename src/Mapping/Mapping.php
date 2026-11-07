@@ -297,6 +297,16 @@ final readonly class Mapping
             $needs[] = self::name($name, $where . '.needs');
         }
 
+        $then = [];
+
+        foreach (Row::map($rule['then'] ?? []) as $number => $next) {
+            $next = self::rule($next, $where . '.then.' . $number);
+
+            if (null !== $next) {
+                $then[] = $next;
+            }
+        }
+
         return new Rule(
             null !== $plugin && !\array_key_exists('block', $rule) ? '' : self::name($rule['block'] ?? null, $where . '.block'),
             \is_string($rule['variant'] ?? null) ? $rule['variant'] : null,
@@ -307,6 +317,7 @@ final readonly class Mapping
             true === ($rule['form'] ?? false),
             $plugin,
             $needs,
+            $then,
         );
     }
 

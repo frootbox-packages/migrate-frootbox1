@@ -58,6 +58,10 @@ plugins:
   Core/FileManager/CopyrightFilesList@Index01: { block: frootbox/theme-base/ImageCredits }
   Core/HelpAndSupport/ContactPersons@Index01: { block: acme/theme/Team, fields: { persons: people } }
   Core/News/Archive@Index01: { plugin: frootbox/news/article }  # the page shows the plugin
+  Acme/Rental/Unit@Index01:            # one plugin, two blocks: "then" adds blocks right after it
+    block: acme/rental/Calendar
+    options: { unit: '{config.unitId}' }
+    then: [{ block: acme/rental/Prices, options: { unit: '{config.unitId}' } }]
 items:
   Teaser: { fields: { title: title, text: text, link: { to: link, text: More } } }
   Contact: { fields: { title: name, position: role, phone: phone, email: email, image: image } }
@@ -104,7 +108,10 @@ it shows on, e.g. `files-{page}` for a slider with images by page, and
 without a heading of its own gets its title, as Frootbox 1 showed it.
 `children` gives the public pages below the page as objects of type
 `Page` with their title, link and fields such as `image` and
-`teaser-text`, e.g. for a sub navigation. A widget in the text fills a
+`teaser-text`, e.g. for a sub navigation. `then` lists further rules for
+the same block or plugin, each a block right after the first, with the
+same texts and configuration, e.g. a calendar and the prices of a holiday
+apartment from one plugin of Frootbox 1. A widget in the text fills a
 list with all its files with `widgets: { Core/Images/Gallery:
 images.#.image }`. Each value is converted by the type
 of the target field: HTML becomes rich text, links to old pages and

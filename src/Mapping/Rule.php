@@ -23,6 +23,7 @@ final readonly class Rule
      * @param bool                        $form    The plugin shows a form of Frootbox 1, which becomes a form of frootbox/forms
      * @param string|null                 $plugin  The page shows this plugin of Frootbox 2 in its default space, e.g. "frootbox/shop/product"; "block" may then be left out
      * @param list<string>                $needs   Fields of the block that must get a value, else the block is left out, e.g. the images of a slider
+     * @param list<Rule>                  $then    Further blocks from the same block or plugin, right after it, e.g. the prices beside the calendar of a holiday apartment
      */
     public function __construct(
         public string $block,
@@ -34,6 +35,7 @@ final readonly class Rule
         public bool $form,
         public ?string $plugin = null,
         public array $needs = [],
+        public array $then = [],
     ) {}
 
     /**
