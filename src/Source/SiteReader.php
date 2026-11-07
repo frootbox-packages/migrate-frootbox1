@@ -189,7 +189,8 @@ final readonly class SiteReader
     {
         $items = [];
 
-        foreach ($this->rows('SELECT * FROM navigations_items ORDER BY orderId IS NULL, orderId, id') as $row) {
+        // As Frootbox 1 shows them: highest orderId first, NULL last.
+        foreach ($this->rows('SELECT * FROM navigations_items ORDER BY orderId IS NULL, orderId DESC, id') as $row) {
             $items[Row::int($row, 'navId')][] = new NavigationItem(
                 Row::int($row, 'id'),
                 Row::int($row, 'parentId'),
