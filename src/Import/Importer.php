@@ -325,6 +325,21 @@ final class Importer
         $above = $page->blocksIn('block-content');
         $below = array_filter($page->blocks, static fn($block): bool => 'block-content' !== $block->area);
         $blocks = [];
+        $this->where = \sprintf('Page %d "%s"', $page->id, $page->title);
+
+        if (null !== $this->mapping->page) {
+            $block = $this->block($this->mapping->page, $page->content, $page->config, null);
+
+            if (null !== $block) {
+                $blocks[] = $block;
+            }
+        } else {
+            foreach ($page->content->fields() as $field) {
+                if ($this->filled($page->content, $field)) {
+                    $this->note(\sprintf('%s: the field "%s" of the page is left out, the mapping has no "page".', $this->where, $field));
+                }
+            }
+        }
 
         foreach ([...$first, ...$above, ...$main, ...$below] as $part) {
             $isElement = $part instanceof Element;
@@ -499,7 +514,8 @@ final class Importer
             $value = match ($old) {
                 'title' => $item->title,
                 'link' => $item->linkedPage(),
-                default => null,
+                // A plain value of the object, e.g. the position of a contact person.
+                default => \is_string($item->config[$old] ?? null) && '' !== $item->config[$old] ? $item->config[$old] : null,
             };
         }
 
@@ -1088,6 +1104,24 @@ final class Importer
     private function placeholders(array $values, array $config): array
     {
         foreach ($values as $key => $value) {
+            // { value: '{config.x}', map: { old: new } } translates a value.
+            if (\is_array($value) && 2 === \count($value) && isset($value['value'], $value['map']) && \is_array($value['map'])) {
+                $old = $this->placeholders(['value' => $value['value']], $config)['value'] ?? null;
+                $old = \is_scalar($old) ? (string) $old : '';
+                $map = Row::map($value['map']);
+
+                if ('' === $old) {
+                    unset($values[$key]);
+                } elseif (\array_key_exists($old, $map)) {
+                    $values[$key] = $map[$old];
+                } else {
+                    $this->note(\sprintf('%s: the option "%s" is left out, the map has no value "%s".', $this->where, $key, $old));
+                    unset($values[$key]);
+                }
+
+                continue;
+            }
+
             if (\is_array($value)) {
                 $values[$key] = $this->placeholders(Row::map($value), $config);
 
@@ -1112,8 +1146,11 @@ final class Importer
                     return Row::pathString($config, ...explode('.', $match[3] ?? ''));
                 }, $value);
 
-                // A single number stays a number, e.g. the zoom of a map.
-                if ($whole && is_numeric($values[$key])) {
+                // A single placeholder without a value leaves the option out.
+                if ($whole && '' === $values[$key]) {
+                    unset($values[$key]);
+                } elseif ($whole && is_numeric($values[$key])) {
+                    // A single number stays a number, e.g. the zoom of a map.
                     $values[$key] = str_contains($values[$key], '.') ? (float) $values[$key] : (int) $values[$key];
                 }
             }

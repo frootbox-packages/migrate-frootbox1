@@ -67,6 +67,9 @@ final class AnalyzerTest extends TestCase
         self::assertContains('Page 3 "Alt" redirects to page 9, which does not exist.', $analysis->problems);
         self::assertContains('A widget 7 in field "text-1" of block 3 (Text) on page 2 is gone; the text keeps an empty figure.', $analysis->problems);
         self::assertContains('File 1 "team.jpg" is missing in uploads/team.jpg.', $analysis->problems);
+        self::assertSame(1, $analysis->page?->count, 'Only the start page has own fields or variables.');
+        self::assertEquals(['background' => ['image' => 1]], $analysis->page->fields);
+        self::assertSame(['variables.bannerStyle' => ['big-header' => 1]], $analysis->page->options);
     }
 
     public function testProposesAMappingToFillIn(): void
@@ -82,6 +85,8 @@ final class AnalyzerTest extends TestCase
         self::assertIsArray($mapping['plugins']);
         self::assertArrayHasKey('Core/Navigation/Teaser@Index06', $mapping['plugins']);
         self::assertSame(['Main' => null], $mapping['navigations']);
+        self::assertSame(['block' => null, 'fields' => ['background' => null]], $mapping['page']);
+        self::assertStringContainsString('# {config.variables.bannerStyle}: big-header', $yaml);
         self::assertStringContainsString('Text: # 2 time(s), project', $yaml);
     }
 }

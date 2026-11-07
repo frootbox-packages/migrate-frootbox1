@@ -23,6 +23,7 @@ final readonly class Analysis
      * @param array<string, Usage> $items       objects of plugins and blocks by class
      * @param array<string, Usage> $widgets     elements inside texts
      * @param list<string>         $problems
+     * @param Usage|null           $page        fields and variables of the pages themselves, e.g. a background image
      */
     public function __construct(
         public Site $site,
@@ -32,5 +33,6 @@ final readonly class Analysis
         public array $items,
         public array $widgets,
         public array $problems,
+        public ?Usage $page = null,
     ) {}
 }

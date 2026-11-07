@@ -36,11 +36,13 @@ final class ImporterTest extends TestCase
         $this->files = sys_get_temp_dir() . '/fb1-import-' . bin2hex(random_bytes(4));
         mkdir($this->files . '/uploads', 0o775, true);
         file_put_contents($this->files . '/uploads/team.jpg', 'jpeg');
+        file_put_contents($this->files . '/uploads/kopf.jpg', 'jpeg');
     }
 
     protected function tearDown(): void
     {
         unlink($this->files . '/uploads/team.jpg');
+        unlink($this->files . '/uploads/kopf.jpg');
         rmdir($this->files . '/uploads');
         rmdir($this->files);
     }
@@ -128,6 +130,7 @@ final class ImporterTest extends TestCase
         $plan = $this->plan();
 
         self::assertSame([
+            'Page 1 "Start": the field "background" of the page is left out, the mapping has no "page".',
             'The image team.jpg has no description (alt text) yet; the mapping can give it one under media.',
             'Block 3 (Text) on page 2 "Über uns": a widget 7 in the text is left out.',
             'Navigation "Main": the entry "Versteckt" is hidden and left out.',
@@ -135,6 +138,34 @@ final class ImporterTest extends TestCase
         ], $plan->report);
         self::assertStringContainsString("- Navigation \"Main\": the entry \"Versteckt\" is hidden and left out.\n", $plan->markdown());
         self::assertStringStartsWith('# The website from Frootbox 1 (old), written by fb1:import.', $plan->yaml('old'));
+    }
+
+    public function testPutsABlockFromThePageItselfOnTop(): void
+    {
+        $plan = $this->plan(page: [
+            'block' => 'acme/site/Banner',
+            'fields' => ['background' => 'image'],
+            'options' => [
+                'height' => ['value' => '{config.variables.bannerStyle}', 'map' => ['big-header' => 'large', 'small-header' => 'small']],
+                'tone' => '{config.variables.tone}',
+            ],
+        ]);
+        $start = self::main($plan->steps[6]);
+        $about = self::main($plan->steps[7]);
+
+        self::assertSame(['block' => 'acme/site/Banner', 'options' => ['height' => 'large'], 'fields' => ['image' => ['media' => '${m3.id}']]], $start[0], 'A placeholder without a value leaves its option out.');
+        self::assertSame('acme/site/Topics', self::at($start, 1, 'block'));
+        self::assertSame(['block' => 'acme/site/Banner', 'fields' => []], $about[0], 'A page without variables gets the defaults of the block.');
+        self::assertSame(['media.create' => ['upload' => '${u3.token}'], 'as' => 'm3'], $plan->steps[1], 'The image of the page comes first.');
+        self::assertNotContains('Page 1 "Start": the field "background" of the page is left out, the mapping has no "page".', $plan->report);
+    }
+
+    public function testTakesPlainValuesOfAnObject(): void
+    {
+        $plan = $this->plan(persons: true);
+        $start = self::main(array_values(array_filter($plan->steps, static fn(array $step): bool => isset($step['page.update'])))[0]);
+
+        self::assertSame(['block' => 'acme/site/Topics', 'fields' => ['items' => [['title' => 'Leitung'], ['title' => 'Lager']]]], $start[0], 'The position of each visible contact person.');
     }
 
     public function testTheMappingFillsInWhatAFileLacks(): void
@@ -154,9 +185,35 @@ final class ImporterTest extends TestCase
     }
 
     /**
-     * @param array<string, array<string, string>> $media
+     * The blocks of the area "main" in a step page.update.
+     *
+     * @param array<string, mixed> $step
+     *
+     * @return array<mixed>
      */
-    private function plan(bool $publish = false, array $media = []): Plan
+    private static function main(array $step): array
+    {
+        $main = self::at($step, 'page.update', 'translations', 'de', 'content', 'areas', 'main');
+        self::assertIsArray($main);
+
+        return $main;
+    }
+
+    private static function at(mixed $value, int|string ...$path): mixed
+    {
+        foreach ($path as $key) {
+            self::assertIsArray($value);
+            $value = $value[$key] ?? null;
+        }
+
+        return $value;
+    }
+
+    /**
+     * @param array<string, array<string, string>> $media
+     * @param array<string, mixed>|null           $page
+     */
+    private function plan(bool $publish = false, array $media = [], ?array $page = null, bool $persons = false): Plan
     {
         $text = self::block('acme/site/Text', [
             'title' => new Field('title', 'headline', 'Title', optional: true),
@@ -170,8 +227,9 @@ final class ImporterTest extends TestCase
                 'link' => new Field('link', 'link', 'Link', optional: true),
             ]),
         ]);
+        $banner = self::block('acme/site/Banner', ['image' => new Field('image', 'image', 'Image', optional: true)]);
         $components = new Components(
-            blocks: ['acme/site/Text' => $text, 'acme/site/Topics' => $topics],
+            blocks: ['acme/site/Text' => $text, 'acme/site/Topics' => $topics, 'acme/site/Banner' => $banner],
             layouts: ['acme/site/Page' => new Component(ComponentKind::Layout, 'acme/site/Page', '/tmp', 'Page', '', [], [], [])],
         );
         $mapping = Mapping::fromArray([
@@ -182,14 +240,24 @@ final class ImporterTest extends TestCase
                 'Text' => ['block' => 'acme/site/Text', 'fields' => ['title' => 'title', 'text-#' => 'columns.#.body'], 'widgets' => ['Core/Images/Thumbnail' => 'image']],
                 'Teaser1' => ['block' => 'acme/site/Topics', 'fields' => ['title' => 'title', 'teasers' => 'items']],
             ],
-            'plugins' => ['Core/Navigation/Teaser@Index06' => false],
-            'items' => ['Teaser' => ['fields' => ['title' => 'title', 'link' => ['to' => 'link', 'text' => 'Mehr'], 'background' => false]]],
+            'plugins' => ['Core/Navigation/Teaser@Index06' => $persons ? ['block' => 'acme/site/Topics', 'fields' => ['persons' => 'items', 'items' => false]] : false],
+            'items' => [
+                'Teaser' => ['fields' => ['title' => 'title', 'link' => ['to' => 'link', 'text' => 'Mehr'], 'background' => false]],
+                'Contact' => ['fields' => ['position' => 'title', 'image' => false]],
+            ],
             'navigations' => ['Main' => 'main'],
             'site' => ['fields' => ['brand' => 'Acme', 'contact' => ['target' => '{page:2}', 'text' => 'Kontakt']]],
             'media' => $media,
+            ...(null === $page ? [] : ['page' => $page]),
         ]);
 
-        return new Importer(new SiteReader(OldSite::create())->read(), $mapping, $components, $this->files)->plan($publish);
+        $old = OldSite::create();
+
+        if ($persons) {
+            OldSite::persons($old);
+        }
+
+        return new Importer(new SiteReader($old)->read(), $mapping, $components, $this->files)->plan($publish);
     }
 
     /**

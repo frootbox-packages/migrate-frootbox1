@@ -42,9 +42,18 @@ use Symfony\Component\Yaml\Yaml;
  *       fields: { brand: Example, contact: { target: '{page:5}', text: Contact } }
  *     media:                              # by the file name in Frootbox 1
  *       team.jpg: { alt: 'The team in front of the practice', copyright: 'Jane Doe' }
+ *     page:                               # fields of the page itself, as a block at its top
+ *       block: acme/theme/Banner
+ *       fields: { background: image }
+ *       options:
+ *         height: { value: '{config.variables.bannerStyle}', map: { big-header: large, small-header: small } }
  *
  * "{page:5}" stands for the new page of page 5 in Frootbox 1, "{config.x}"
- * for a value in the configuration of the block or plugin.
+ * for a value in the configuration of the block or plugin (of the page
+ * for "page"). An option that is only a placeholder without a value is
+ * left out, so the default of the block counts; `{ value, map }`
+ * translates the value and leaves the option out for a value the map
+ * does not name.
  */
 final readonly class Mapping
 {
@@ -58,6 +67,7 @@ final readonly class Mapping
      * @param array<string, string|null> $navigations
      * @param array<string, mixed>       $site        Fields of the website
      * @param array<string, array{alt?: string, copyright?: string}> $media Texts of files by their name in Frootbox 1, where they lack them
+     * @param Rule|null                  $page        A block at the top of every page from the fields of the page itself, e.g. its background image
      */
     public function __construct(
         public array $languages,
@@ -69,6 +79,7 @@ final readonly class Mapping
         public array $navigations,
         public array $site,
         public array $media = [],
+        public ?Rule $page = null,
     ) {}
 
     /**
@@ -149,7 +160,9 @@ final readonly class Mapping
             );
         }
 
-        return new self($languages, $domains, $layouts, $blocks, $plugins, $items, $navigations, Row::map(Row::map($data['site'] ?? [])['fields'] ?? []), $media);
+        $page = isset($data['page']) ? self::rule($data['page'], 'page') : null;
+
+        return new self($languages, $domains, $layouts, $blocks, $plugins, $items, $navigations, Row::map(Row::map($data['site'] ?? [])['fields'] ?? []), $media, $page);
     }
 
     /**

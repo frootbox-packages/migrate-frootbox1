@@ -75,6 +75,19 @@ final class MappingProposal
             }
         }
 
+        if (null !== $analysis->page) {
+            $lines[] = '';
+            $lines[] = '# Fields of the pages themselves, e.g. a background image, as a block at the top of each page.';
+
+            foreach ($analysis->page->options as $option => $values) {
+                $lines[] = \sprintf('# {config.%s}: %s', $option, implode(', ', array_keys($values)));
+            }
+
+            $lines[] = \sprintf('page: # %d page(s)', $analysis->page->count);
+            $lines[] = '  block: ~';
+            $lines = [...$lines, ...self::fields($analysis->page, null, '  ')];
+        }
+
         $lines[] = '';
         $lines[] = 'navigations:';
 

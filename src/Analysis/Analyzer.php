@@ -30,12 +30,26 @@ final class Analyzer
         $items = [];
         $widgets = [];
         $problems = [];
+        $own = null;
 
         foreach ($site->pages as $page) {
             $layout = '' === $page->view() ? 'Default' : $page->view();
             $usage = $layouts[$layout] ??= new Usage($layout);
             ++$usage->count;
             $usage->pages[$page->id] = true;
+
+            $variables = self::flatten(Row::map($page->config['variables'] ?? []));
+
+            if ([] !== $page->content->fields() || [] !== $variables) {
+                $own ??= new Usage('page');
+                ++$own->count;
+                $own->pages[$page->id] = true;
+                self::fields($own, $page->content, $items);
+
+                foreach ($variables as $name => $value) {
+                    $own->option('variables.' . $name, $value);
+                }
+            }
 
             foreach ($page->blocks as $block) {
                 $usage = $blocks[$block->type] ??= new Usage($block->type, '' === $block->library() ? 'project' : $block->library());
@@ -85,7 +99,7 @@ final class Analyzer
 
         ksort($widgets);
 
-        return new Analysis($site, $layouts, $blocks, $plugins, $items, $widgets, $problems);
+        return new Analysis($site, $layouts, $blocks, $plugins, $items, $widgets, $problems, $own);
     }
 
     /**
@@ -114,6 +128,13 @@ final class Analyzer
 
                 if (null !== $item->linkedPage()) {
                     $nested->field('link', 'page');
+                }
+
+                // Plain values such as the position or phone of a contact person.
+                foreach ($item->config as $key => $value) {
+                    if (\is_string($value) && '' !== $value) {
+                        $nested->field($key, 'value');
+                    }
                 }
             }
         }

@@ -41,7 +41,9 @@ final class OldSite
         }
 
         $page = 'Frootbox-Persistence-Repositories-Pages';
-        $connection->insert('pages', ['id' => 1, 'parentId' => 0, 'lft' => 1, 'rgt' => 6, 'language' => 'de-DE', 'title' => 'Start', 'alias' => '', 'visibility' => 'Public', 'type' => 'Default']);
+        $connection->insert('pages', ['id' => 1, 'parentId' => 0, 'lft' => 1, 'rgt' => 6, 'language' => 'de-DE', 'title' => 'Start', 'alias' => '', 'config' => '{"variables":{"bannerStyle":"big-header"}}', 'visibility' => 'Public', 'type' => 'Default']);
+        // The background image of the start page belongs to the page itself.
+        $connection->insert('files', ['id' => 3, 'name' => 'kopf.jpg', 'type' => 'image/jpeg', 'size' => 10, 'path' => 'uploads/kopf.jpg', 'uid' => $page . ':1:background']);
         $connection->insert('pages', ['id' => 2, 'parentId' => 1, 'lft' => 2, 'rgt' => 3, 'language' => 'de-DE', 'title' => 'Über uns', 'alias' => 'ueber-uns', 'config' => '{"view":null,"seo":{"title":"Wer wir sind","description":"Alt.","preventIndexing":null},"search":{"preventIndexing":"1"}}', 'visibility' => 'Public', 'type' => 'Default']);
         $connection->insert('pages', ['id' => 3, 'parentId' => 1, 'lft' => 4, 'rgt' => 5, 'language' => 'de-DE', 'title' => 'Alt', 'alias' => 'alt', 'config' => '{"pageType":"Redirect","redirect":{"target":"fbx:\/\/page:9"}}', 'visibility' => 'Public', 'type' => 'Redirect']);
 
@@ -74,5 +76,21 @@ final class OldSite
         $connection->insert('navigations_items', ['id' => 2, 'navId' => 1, 'parentId' => 0, 'title' => 'Versteckt', 'className' => 'Frootbox\Ext\Core\Navigation\Navigations\Items\Page\Item', 'config' => '{"pageId":"1"}', 'visibility' => 0]);
 
         return $connection;
+    }
+
+    /**
+     * Contact persons for the teaser plugin (id 1): two visible, one hidden,
+     * the first with an older and a newer image.
+     */
+    public static function persons(Connection $connection): void
+    {
+        $connection->executeStatement('CREATE TABLE persons (id INTEGER PRIMARY KEY, pluginId INT, pageId INT, orderId INT, className TEXT, config TEXT, gender TEXT, title TEXT, firstName TEXT, lastName TEXT, phone TEXT, email TEXT, position TEXT, visibility INT)');
+        $contact = 'Frootbox\\Ext\\Core\\HelpAndSupport\\Persistence\\Contact';
+        $connection->insert('persons', ['id' => 1, 'pluginId' => 1, 'pageId' => 1, 'orderId' => 2, 'className' => $contact, 'firstName' => 'Erika', 'lastName' => 'Muster', 'phone' => '0123 45', 'email' => 'erika@example.test', 'position' => 'Leitung', 'title' => '', 'visibility' => 2]);
+        $connection->insert('persons', ['id' => 2, 'pluginId' => 1, 'pageId' => 1, 'orderId' => 1, 'className' => $contact, 'firstName' => 'Max', 'lastName' => 'Muster', 'position' => 'Lager', 'visibility' => 2]);
+        $connection->insert('persons', ['id' => 3, 'pluginId' => 1, 'pageId' => 1, 'orderId' => 0, 'className' => $contact, 'firstName' => 'Versteckt', 'visibility' => 0]);
+        $contacts = 'Frootbox-Ext-Core-HelpAndSupport-Persistence-Repositories-Contacts';
+        $connection->insert('files', ['id' => 10, 'orderId' => 2, 'name' => 'alt.jpg', 'type' => 'image/jpeg', 'size' => 10, 'path' => 'uploads/alt.jpg', 'uid' => $contacts . ':1:image']);
+        $connection->insert('files', ['id' => 11, 'orderId' => 3, 'name' => 'neu.jpg', 'type' => 'image/jpeg', 'size' => 10, 'path' => 'uploads/neu.jpg', 'uid' => $contacts . ':1:image']);
     }
 }

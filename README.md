@@ -52,8 +52,15 @@ plugins:
   Core/Navigation/Teaser@Index06: { block: acme/theme/Stage, fields: { items.1.background: image } }
   Core/ContactForms/FormTeaser@Index01: { block: frootbox/forms/Form, form: true }
   Core/FileManager/CopyrightFilesList@Index01: { block: frootbox/theme-base/ImageCredits }
+  Core/HelpAndSupport/ContactPersons@Index01: { block: acme/theme/Team, fields: { persons: people } }
 items:
   Teaser: { fields: { title: title, text: text, link: { to: link, text: More } } }
+  Contact: { fields: { title: name, position: role, phone: phone, email: email, image: image } }
+page:                               # fields of the page itself, as a block on top
+  block: acme/theme/Banner
+  fields: { background: image }
+  options:
+    height: { value: '{config.variables.bannerStyle}', map: { big-header: large, small-header: small } }
 navigations: { BannerMain: main }
 site:
   fields: { brand: Example, contact: { target: '{page:5}', text: Contact } }
@@ -62,7 +69,12 @@ media:                              # by the file name in Frootbox 1
 ```
 
 `{page:5}` is the new page of page 5 in Frootbox 1, `{config.x}` a value
-in the configuration of the old block. Each value is converted by the type
+in the configuration of the old block (or page). `{ value: …, map: … }`
+translates such a value; an option without a value is left out. Objects
+give their title, their linked page and plain values such as the
+`position` of a contact person; the contact persons of a plugin are the
+list `persons`. Of several files in one field the import takes the one
+Frootbox 1 shows. Each value is converted by the type
 of the target field: HTML becomes rich text, links to old pages and
 aliases become links to the new pages, files become media.
 Under `media` the mapping fills in an alt text or a copyright that a file

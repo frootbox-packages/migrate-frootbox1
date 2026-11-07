@@ -16,11 +16,15 @@ use Doctrine\DBAL\Connection;
  *
  * Texts and files hang on their owners by UID. Owners besides pages,
  * blocks, plugins and widgets are objects in assets, whatever their
- * repository is called.
+ * repository is called. Contact persons live in a table of their own
+ * and hang on their plugin as the list "persons".
  */
 final readonly class SiteReader
 {
-    private const array OWNERS = ['Pages', 'Blocks', 'ContentElements', 'Widgets'];
+    private const array OWNERS = ['Pages', 'Blocks', 'ContentElements', 'Widgets', 'Contacts'];
+
+    /** Columns of a contact person that the mapping can name like texts. */
+    private const array PERSON = ['gender', 'title', 'firstName', 'lastName', 'position', 'company', 'phone', 'phone2', 'fax', 'email', 'street', 'streetNumber', 'zipcode', 'city', 'facebook', 'instagram', 'xing', 'linkedin', 'twitter', 'youtube', 'twitch'];
 
     public function __construct(private Connection $connection) {}
 
@@ -46,7 +50,8 @@ final readonly class SiteReader
 
         $files = [];
 
-        foreach ($this->rows('SELECT * FROM files ORDER BY orderId, id') as $row) {
+        // Frootbox 1 shows the file of a field with the highest orderId.
+        foreach ($this->rows('SELECT * FROM files ORDER BY orderId DESC, id') as $row) {
             $uid = Uid::parse(Row::string($row, 'uid'));
             $config = Row::json($row, 'config');
             $file = new File(
@@ -89,6 +94,19 @@ final readonly class SiteReader
             } elseif (Row::int($row, 'pluginId') > 0) {
                 $content('ContentElements:' . Row::int($row, 'pluginId'))->items['items'][] = $item;
             }
+        }
+
+        foreach ($this->persons() as $pluginId => $row) {
+            $content('ContentElements:' . $pluginId)->items['persons'][] = new Item(
+                Row::int($row, 'id'),
+                Row::string($row, 'className'),
+                trim(Row::string($row, 'firstName') . ' ' . Row::string($row, 'lastName')),
+                0,
+                Row::int($row, 'orderId'),
+                Row::int($row, 'visibility') > 0,
+                array_filter(array_intersect_key($row, array_flip(self::PERSON)), static fn(mixed $value): bool => \is_string($value) && '' !== $value) + Row::json($row, 'config'),
+                $content('Contacts:' . Row::int($row, 'id')),
+            );
         }
 
         $pages = [];
@@ -214,6 +232,22 @@ final readonly class SiteReader
         }
 
         return $aliases;
+    }
+
+    /**
+     * Contact persons by plugin, as Frootbox 1 shows them: highest orderId first.
+     *
+     * @return \Generator<int, array<string, mixed>>
+     */
+    private function persons(): \Generator
+    {
+        if (!$this->connection->createSchemaManager()->tablesExist(['persons'])) {
+            return;
+        }
+
+        foreach ($this->rows('SELECT * FROM persons WHERE pluginId IS NOT NULL ORDER BY orderId DESC, id') as $row) {
+            yield Row::int($row, 'pluginId') => $row;
+        }
     }
 
     private static function key(Uid $uid): string
