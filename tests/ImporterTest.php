@@ -92,6 +92,31 @@ final class ImporterTest extends TestCase
         );
     }
 
+    public function testAPluginOfFrootbox1BecomesThePluginOfItsPage(): void
+    {
+        $steps = $this->plan(true, teaser: ['plugin' => 'acme/site/topic'])->steps;
+        $assign = array_values(array_filter($steps, static fn(array $step): bool => isset($step['plugin.assign'])));
+        $updates = array_keys(array_filter($steps, static fn(array $step): bool => isset($step['page.update'])));
+
+        self::assertSame([['plugin.assign' => ['id' => '${p1.id}', 'type' => 'acme/site/topic']]], $assign);
+        self::assertNotSame([], $updates);
+        self::assertGreaterThan(max($updates), array_search($assign[0], $steps, true), 'After the content: the view of the plugin joins it.');
+        self::assertSame(['acme/site/Topics', 'acme/site/Text'], array_column(self::main($steps[4]), 'block'), 'Without "block" the plugin is no block in the area, the topics are the block Teaser1.');
+
+        $both = $this->plan(teaser: ['block' => 'acme/site/Topics', 'plugin' => 'acme/site/topic'])->steps;
+
+        self::assertSame(['acme/site/Topics', 'acme/site/Topics', 'acme/site/Text'], array_column(self::main($both[4]), 'block'));
+        self::assertContains(['plugin.assign' => ['id' => '${p1.id}', 'type' => 'acme/site/topic']], $both);
+    }
+
+    public function testAPluginNeedsAPlaceInTheLayout(): void
+    {
+        $plan = $this->plan(teaser: ['plugin' => 'acme/site/topic'], pluginPlace: false);
+
+        self::assertSame([], array_filter($plan->steps, static fn(array $step): bool => isset($step['plugin.assign'])));
+        self::assertStringContainsString('cannot show the plugin acme/site/topic, its layout acme/site/Page has no place for one', $plan->markdown());
+    }
+
     public function testTakesOverNavigationsFieldsAndOldAddresses(): void
     {
         $plan = $this->plan();
@@ -232,8 +257,9 @@ final class ImporterTest extends TestCase
      * @param array<string, array<string, string>> $media
      * @param array<string, mixed>|null           $page
      * @param array<string, mixed>                $textOptions
+     * @param array<string, mixed>|null           $teaser      The rule for the plugin Teaser instead of the usual one
      */
-    private function plan(bool $publish = false, array $media = [], ?array $page = null, bool $persons = false, bool $gallery = false, array $textOptions = []): Plan
+    private function plan(bool $publish = false, array $media = [], ?array $page = null, bool $persons = false, bool $gallery = false, array $textOptions = [], ?array $teaser = null, bool $pluginPlace = true): Plan
     {
         $text = self::block('acme/site/Text', [
             'title' => new Field('title', 'headline', 'Title', optional: true),
@@ -251,7 +277,7 @@ final class ImporterTest extends TestCase
         $images = self::block('acme/site/Gallery', ['items' => new Field('items', 'list', 'Images', fields: ['image' => new Field('image', 'image', 'Image')])]);
         $components = new Components(
             blocks: ['acme/site/Text' => $text, 'acme/site/Topics' => $topics, 'acme/site/Banner' => $banner, 'acme/site/Gallery' => $images],
-            layouts: ['acme/site/Page' => new Component(ComponentKind::Layout, 'acme/site/Page', '/tmp', 'Page', '', [], [], [])],
+            layouts: ['acme/site/Page' => new Component(ComponentKind::Layout, 'acme/site/Page', '/tmp', 'Page', '', [], [], [], plugin: $pluginPlace)],
         );
         $mapping = Mapping::fromArray([
             'languages' => ['de-DE' => 'de'],
@@ -262,7 +288,7 @@ final class ImporterTest extends TestCase
                 'Teaser1' => ['block' => 'acme/site/Topics', 'fields' => ['title' => 'title', 'teasers' => 'items']],
                 'Gallery' => $gallery ? ['block' => 'acme/site/Gallery', 'fields' => ['images' => 'items.#.image']] : false,
             ],
-            'plugins' => ['Core/Navigation/Teaser@Index06' => $persons ? ['block' => 'acme/site/Topics', 'fields' => ['persons' => 'items', 'items' => false]] : false],
+            'plugins' => ['Core/Navigation/Teaser@Index06' => $teaser ?? ($persons ? ['block' => 'acme/site/Topics', 'fields' => ['persons' => 'items', 'items' => false]] : false)],
             'items' => [
                 'Teaser' => ['fields' => ['title' => 'title', 'link' => ['to' => 'link', 'text' => 'Mehr'], 'background' => false]],
                 'Contact' => ['fields' => ['position' => 'title', 'image' => false]],

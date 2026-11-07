@@ -75,6 +75,9 @@ final class Importer
     /** @var array<int, true> Pages created in Frootbox 2 */
     private array $created = [];
 
+    /** @var array<int, string> Page of Frootbox 1 → the plugin of Frootbox 2 it shows */
+    private array $plugins = [];
+
     private string $language = '';
 
     private string $code = '';
@@ -167,7 +170,7 @@ final class Importer
             }
         }
 
-        $steps = [...$this->media, ...$create, ...$this->forms, ...$content, ...$this->navigations(), ...$this->siteFields(), ...$this->redirects($pages)];
+        $steps = [...$this->media, ...$create, ...$this->forms, ...$content, ...$this->assignments(), ...$this->navigations(), ...$this->siteFields(), ...$this->redirects($pages)];
 
         if ($publish) {
             $steps = [...$steps, ...$this->publish()];
@@ -367,6 +370,14 @@ final class Importer
                 continue;
             }
 
+            if (null !== $rule->plugin) {
+                $this->plugin($page, $rule->plugin);
+            }
+
+            if ($rule->onlyPlugin()) {
+                continue;
+            }
+
             $block = $this->block($rule, $part->content, $part->config, $isElement ? $part : null);
 
             if (null !== $block) {
@@ -375,6 +386,50 @@ final class Importer
         }
 
         return $blocks;
+    }
+
+    /**
+     * Notes the plugin the page shows; one per page, in a layout with a
+     * place for it.
+     */
+    private function plugin(Page $page, string $type): void
+    {
+        $current = $this->plugins[$page->id] ?? null;
+
+        if (null !== $current) {
+            if ($current !== $type) {
+                $this->note(\sprintf('%s: the page shows the plugin %s already, %s is left out.', $this->where, $current, $type));
+            }
+
+            return;
+        }
+
+        $layout = $this->mapping->layouts['' === $page->view() ? 'Default' : $page->view()]['layout'] ?? '';
+
+        if (true !== $this->components->layout($layout)?->plugin) {
+            $this->note(\sprintf('%s: the page cannot show the plugin %s, its layout %s has no place for one.', $this->where, $type, $layout));
+
+            return;
+        }
+
+        $this->plugins[$page->id] = $type;
+    }
+
+    /**
+     * The pages that show a plugin, after their content: the view of the
+     * plugin joins the content of the draft.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function assignments(): array
+    {
+        $steps = [];
+
+        foreach ($this->plugins as $page => $type) {
+            $steps[] = ['plugin.assign' => ['id' => $this->ref($page), 'type' => $type]];
+        }
+
+        return $steps;
     }
 
     /**

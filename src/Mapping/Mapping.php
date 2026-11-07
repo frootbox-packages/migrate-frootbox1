@@ -35,6 +35,7 @@ use Symfony\Component\Yaml\Yaml;
  *     plugins:
  *       Core/Navigation/Teaser@Index06: { block: …, fields: { items.1.background: image } }
  *       Core/ContactForms/FormTeaser@Index01: { block: frootbox/forms/Form, form: true }
+ *       Core/News/Archive@Index01: { plugin: frootbox/news/article }   # the page shows the plugin
  *     items:
  *       Teaser: { fields: { title: title, text: text, link: { to: link, text: More } } }
  *     navigations: { BannerMain: main }
@@ -180,6 +181,12 @@ final readonly class Mapping
             return null;
         }
 
+        $plugin = $rule['plugin'] ?? null;
+
+        if (null !== $plugin && (!\is_string($plugin) || '' === $plugin)) {
+            throw new MappingException(\sprintf('%s.plugin must be the type of a plugin of Frootbox 2, e.g. "frootbox/news/article".', $where));
+        }
+
         $fields = [];
 
         foreach (Row::map($rule['fields'] ?? []) as $old => $new) {
@@ -198,13 +205,14 @@ final readonly class Mapping
         }
 
         return new Rule(
-            self::name($rule['block'] ?? null, $where . '.block'),
+            null !== $plugin && !\array_key_exists('block', $rule) ? '' : self::name($rule['block'] ?? null, $where . '.block'),
             \is_string($rule['variant'] ?? null) ? $rule['variant'] : null,
             Row::map($rule['options'] ?? []),
             $fields,
             Row::map($rule['set'] ?? []),
             $widgets,
             true === ($rule['form'] ?? false),
+            $plugin,
         );
     }
 

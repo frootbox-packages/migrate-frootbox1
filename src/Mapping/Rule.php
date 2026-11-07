@@ -10,7 +10,8 @@ namespace Frootbox\MigrateFrootbox1\Mapping;
 
 /**
  * How a block, plugin or object of Frootbox 1 becomes a block (or an
- * entry of a list) of Frootbox 2.
+ * entry of a list) of Frootbox 2, and a plugin of Frootbox 1 also the
+ * plugin its page shows.
  */
 final readonly class Rule
 {
@@ -20,6 +21,7 @@ final readonly class Rule
      * @param array<string, mixed>        $set     Fixed values of fields, e.g. text the old template had
      * @param array<string, string|null>  $widgets Type of a widget in the text → image field of the block
      * @param bool                        $form    The plugin shows a form of Frootbox 1, which becomes a form of frootbox/forms
+     * @param string|null                 $plugin  The page shows this plugin of Frootbox 2 in its default space, e.g. "frootbox/shop/product"; "block" may then be left out
      */
     public function __construct(
         public string $block,
@@ -29,5 +31,14 @@ final readonly class Rule
         public array $set,
         public array $widgets,
         public bool $form,
+        public ?string $plugin = null,
     ) {}
+
+    /**
+     * Only the plugin, no block in the area.
+     */
+    public function onlyPlugin(): bool
+    {
+        return '' === $this->block;
+    }
 }

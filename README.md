@@ -54,6 +54,7 @@ plugins:
   Core/ContactForms/FormTeaser@Index01: { block: frootbox/forms/Form, form: true }
   Core/FileManager/CopyrightFilesList@Index01: { block: frootbox/theme-base/ImageCredits }
   Core/HelpAndSupport/ContactPersons@Index01: { block: acme/theme/Team, fields: { persons: people } }
+  Core/News/Archive@Index01: { plugin: frootbox/news/article }  # the page shows the plugin
 items:
   Teaser: { fields: { title: title, text: text, link: { to: link, text: More } } }
   Contact: { fields: { title: name, position: role, phone: phone, email: email, image: image } }
@@ -76,7 +77,10 @@ first image the block takes from its text, e.g. `{widget.align}` or
 translates such a value; an option without a value is left out. Objects
 give their title, their linked page and plain values such as the
 `position` of a contact person; the contact persons of a plugin are the
-list `persons`. Of several files in one field the import takes the one
+list `persons`. A plugin with `plugin:` makes its page show that plugin
+of Frootbox 2 in its default space, after the content; with `block:` as
+well, its texts also become that block. The layout of the page needs a
+place for a plugin. Of several files in one field the import takes the one
 Frootbox 1 shows. Each value is converted by the type
 of the target field: HTML becomes rich text, links to old pages and
 aliases become links to the new pages, files become media.
