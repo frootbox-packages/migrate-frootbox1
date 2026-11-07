@@ -423,7 +423,7 @@ final class Importer
         $used = [];
 
         foreach ($rule->fields as $old => $target) {
-            foreach ($this->sources($old, $content, $item) as [$number, $field, $value]) {
+            foreach ($this->sources($old, $content, $item, null !== $target && str_contains($target->path, '.#.')) as [$number, $field, $value]) {
                 $used[$field] = true;
 
                 if (null === $target) {
@@ -473,11 +473,23 @@ final class Importer
      * "text-#" gives all numbered fields, "title.supertitle" a value of the
      * headline, "items.1.background" a field of the first object of a
      * list, "title" and "link" of an object its title and linked page.
+     * Into a list ("items.#.image") the files of one field go one by one,
+     * as in a gallery.
      *
      * @return list<array{int, string, mixed}>
      */
-    private function sources(string $old, Content $content, ?Item $item): array
+    private function sources(string $old, Content $content, ?Item $item, bool $many = false): array
     {
+        if ($many && isset($content->files[$old])) {
+            $found = [];
+
+            foreach (array_values($content->files[$old]) as $index => $file) {
+                $found[] = [$index + 1, $old, $file];
+            }
+
+            return $found;
+        }
+
         if (str_contains($old, '-#')) {
             $pattern = '/^' . str_replace('\-\#', '-(\d+)', preg_quote($old, '/')) . '$/';
             $found = [];

@@ -46,6 +46,7 @@ blocks:
       title: title                  # field of Frootbox 1: field of Frootbox 2
       title.supertitle: eyebrow     # a value of the headline
       text-#: columns.#.body        # numbered fields into a list
+  Gallery: { block: acme/theme/Gallery, fields: { images: items.#.image } }  # each file an entry
     widgets: { Core/Images/Thumbnail: image }  # the first image widget in the text
   BreakerImage: false
 plugins:

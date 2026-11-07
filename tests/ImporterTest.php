@@ -168,6 +168,14 @@ final class ImporterTest extends TestCase
         self::assertSame(['block' => 'acme/site/Topics', 'fields' => ['items' => [['title' => 'Leitung'], ['title' => 'Lager']]]], $start[0], 'The position of each visible contact person.');
     }
 
+    public function testTakesTheImagesOfAGalleryOneByOne(): void
+    {
+        $plan = $this->plan(gallery: true);
+        $about = self::main(array_values(array_filter($plan->steps, static fn(array $step): bool => '${p2.id}' === self::at($step, 'page.update', 'id')))[0]);
+
+        self::assertSame(['block' => 'acme/site/Gallery', 'fields' => ['items' => [['image' => ['media' => '${m5.id}']], ['image' => ['media' => '${m4.id}']]]]], $about[0], 'Highest orderId first, as Frootbox 1 shows them.');
+    }
+
     public function testTheMappingFillsInWhatAFileLacks(): void
     {
         $plan = $this->plan(media: ['team.jpg' => ['alt' => 'Das Team vor der Praxis', 'copyright' => 'Max Muster']]);
@@ -202,7 +210,10 @@ final class ImporterTest extends TestCase
     private static function at(mixed $value, int|string ...$path): mixed
     {
         foreach ($path as $key) {
-            self::assertIsArray($value);
+            if (!\is_array($value)) {
+                return null;
+            }
+
             $value = $value[$key] ?? null;
         }
 
@@ -213,7 +224,7 @@ final class ImporterTest extends TestCase
      * @param array<string, array<string, string>> $media
      * @param array<string, mixed>|null           $page
      */
-    private function plan(bool $publish = false, array $media = [], ?array $page = null, bool $persons = false): Plan
+    private function plan(bool $publish = false, array $media = [], ?array $page = null, bool $persons = false, bool $gallery = false): Plan
     {
         $text = self::block('acme/site/Text', [
             'title' => new Field('title', 'headline', 'Title', optional: true),
@@ -228,8 +239,9 @@ final class ImporterTest extends TestCase
             ]),
         ]);
         $banner = self::block('acme/site/Banner', ['image' => new Field('image', 'image', 'Image', optional: true)]);
+        $images = self::block('acme/site/Gallery', ['items' => new Field('items', 'list', 'Images', fields: ['image' => new Field('image', 'image', 'Image')])]);
         $components = new Components(
-            blocks: ['acme/site/Text' => $text, 'acme/site/Topics' => $topics, 'acme/site/Banner' => $banner],
+            blocks: ['acme/site/Text' => $text, 'acme/site/Topics' => $topics, 'acme/site/Banner' => $banner, 'acme/site/Gallery' => $images],
             layouts: ['acme/site/Page' => new Component(ComponentKind::Layout, 'acme/site/Page', '/tmp', 'Page', '', [], [], [])],
         );
         $mapping = Mapping::fromArray([
@@ -239,6 +251,7 @@ final class ImporterTest extends TestCase
             'blocks' => [
                 'Text' => ['block' => 'acme/site/Text', 'fields' => ['title' => 'title', 'text-#' => 'columns.#.body'], 'widgets' => ['Core/Images/Thumbnail' => 'image']],
                 'Teaser1' => ['block' => 'acme/site/Topics', 'fields' => ['title' => 'title', 'teasers' => 'items']],
+                'Gallery' => $gallery ? ['block' => 'acme/site/Gallery', 'fields' => ['images' => 'items.#.image']] : false,
             ],
             'plugins' => ['Core/Navigation/Teaser@Index06' => $persons ? ['block' => 'acme/site/Topics', 'fields' => ['persons' => 'items', 'items' => false]] : false],
             'items' => [

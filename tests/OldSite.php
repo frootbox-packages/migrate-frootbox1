@@ -51,6 +51,10 @@ final class OldSite
         $connection->insert('blocks', ['id' => 1, 'pageId' => 1, 'uid' => $page . ':1:block-content', 'blockId' => 'Text', 'orderId' => 1, 'config' => '{"template":{"variables":{"columns":"2"}}}', 'visibility' => 2]);
         $connection->insert('blocks', ['id' => 2, 'pageId' => 1, 'uid' => $page . ':1:block-content', 'blockId' => 'Teaser1', 'className' => 'Frootbox\Ext\Acme\Library\Blocks\Teaser\Block', 'orderId' => 2, 'visibility' => 2]);
         $connection->insert('blocks', ['id' => 3, 'pageId' => 2, 'uid' => $page . ':2:block-content', 'blockId' => 'Text', 'visibility' => 2]);
+        $connection->insert('blocks', ['id' => 4, 'pageId' => 2, 'uid' => $page . ':2:block-content', 'blockId' => 'Gallery', 'orderId' => 1, 'visibility' => 2]);
+        // The images of a gallery, as Frootbox 1 shows them: highest orderId first.
+        $connection->insert('files', ['id' => 4, 'orderId' => 1, 'name' => 'zwei.jpg', 'type' => 'image/jpeg', 'size' => 10, 'path' => 'uploads/team.jpg', 'uid' => self::BLOCKS . ':4:images']);
+        $connection->insert('files', ['id' => 5, 'orderId' => 2, 'name' => 'eins.jpg', 'type' => 'image/jpeg', 'size' => 10, 'path' => 'uploads/kopf.jpg', 'uid' => self::BLOCKS . ':4:images']);
 
         $connection->insert('content_texts', ['uid' => self::BLOCKS . ':1:title', 'text' => '<span class="head">Willkommen</span>', 'config' => '{"headline":"Willkommen","level":"h2"}', 'language' => 'de-DE']);
         $connection->insert('content_texts', ['uid' => self::BLOCKS . ':1:text-1', 'text' => '<figure data-id="1"></figure><p>Hallo</p>', 'language' => 'de-DE']);
