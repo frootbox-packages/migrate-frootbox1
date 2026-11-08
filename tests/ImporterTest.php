@@ -259,6 +259,16 @@ final class ImporterTest extends TestCase
         self::assertContains(['redirect.create' => ['path' => '/team/max-muster', 'target' => 'page:${p1.id}']], $redirects, 'Not the page with the id of the contact person.');
     }
 
+    public function testAPageGetsItsLiveAddressAndTheOthersRedirect(): void
+    {
+        $steps = $this->plan(suffixed: true)->steps;
+        $page = array_values(array_filter($steps, static fn(array $step): bool => 'p2' === ($step['as'] ?? null)))[0];
+        $redirects = array_column(array_column(array_filter($steps, static fn(array $step): bool => isset($step['redirect.create'])), 'redirect.create'), 'target', 'path');
+
+        self::assertSame('ueber-uns', self::at($page, 'page.create', 'translations', 'de', 'slug'));
+        self::assertSame(['/about' => 'page:${p2.id}', '/-1' => 'page:${p1.id}', '/-2' => 'page:${p1.id}', '/ueber-uns-1' => 'page:${p2.id}'], $redirects, 'No redirect at the path of a page.');
+    }
+
     public function testTakesPlainValuesOfAnObject(): void
     {
         $plan = $this->plan(persons: true);
@@ -455,7 +465,7 @@ final class ImporterTest extends TestCase
      * @param bool                                $tree        With an inherited slider, a sub navigation and a gallery widget
      * @param bool                                $grid        With a grid of two columns on the start page
      */
-    private function plan(bool $publish = false, array $media = [], ?array $page = null, array $pages = [], bool $persons = false, bool $gallery = false, array $textOptions = [], ?array $teaser = null, bool $pluginPlace = true, ?array $content = null, array $menus = [], array $widgets = ['Core/Images/Thumbnail' => 'image'], array $blocks = [], array $plugins = [], array $items = [], bool $tree = false, bool $grid = false): Plan
+    private function plan(bool $publish = false, array $media = [], ?array $page = null, array $pages = [], bool $persons = false, bool $gallery = false, array $textOptions = [], ?array $teaser = null, bool $pluginPlace = true, ?array $content = null, array $menus = [], array $widgets = ['Core/Images/Thumbnail' => 'image'], array $blocks = [], array $plugins = [], array $items = [], bool $tree = false, bool $grid = false, bool $suffixed = false): Plan
     {
         $text = self::block('acme/site/Text', [
             'title' => new Field('title', 'headline', 'Title', optional: true),
@@ -516,6 +526,10 @@ final class ImporterTest extends TestCase
 
         if ($grid) {
             OldSite::grid($old);
+        }
+
+        if ($suffixed) {
+            OldSite::suffixed($old);
         }
 
         return new Importer(new SiteReader($old)->read(), $mapping, $components, $this->files)->plan($publish);

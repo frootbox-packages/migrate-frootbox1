@@ -121,6 +121,22 @@ final class OldSite
     }
 
     /**
+     * As at Erste Hilfe Coach: Frootbox 1 saved the pages again and wrote
+     * addresses with a counter to pages.alias, while the older ones
+     * without it still lead to the pages with status 200.
+     */
+    public static function suffixed(Connection $connection): void
+    {
+        $pages = 'Frootbox\Persistence\Repositories\Pages';
+        $connection->update('pages', ['alias' => '-2'], ['id' => 1]);
+        $connection->update('pages', ['alias' => 'ueber-uns-1'], ['id' => 2]);
+        $connection->insert('aliases', ['alias' => '', 'pageId' => 1, 'itemId' => 1, 'itemModel' => $pages, 'language' => 'de-DE', 'status' => 200]);
+        $connection->insert('aliases', ['alias' => '-1', 'pageId' => 1, 'itemId' => 1, 'itemModel' => $pages, 'language' => 'de-DE', 'status' => 200]);
+        $connection->insert('aliases', ['alias' => '-2', 'pageId' => 1, 'itemId' => 1, 'itemModel' => $pages, 'language' => 'de-DE', 'status' => 200]);
+        $connection->insert('aliases', ['alias' => 'ueber-uns-1', 'pageId' => 2, 'itemId' => 2, 'itemModel' => $pages, 'language' => 'de-DE', 'status' => 200]);
+    }
+
+    /**
      * Contact persons for the teaser plugin (id 1): two visible, one hidden,
      * the first with an older and a newer image.
      */

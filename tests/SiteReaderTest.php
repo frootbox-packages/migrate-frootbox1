@@ -44,6 +44,20 @@ final class SiteReaderTest extends TestCase
         self::assertSame(['Start', 'Kontakt', 'Über uns', 'Versteckt'], $titles, 'Highest orderId first, without one last.');
     }
 
+    public function testAPageKeepsTheAddressItHadLive(): void
+    {
+        $connection = OldSite::create();
+        OldSite::suffixed($connection);
+        $connection->insert('pages', ['id' => 4, 'parentId' => 1, 'lft' => 6, 'rgt' => 7, 'language' => 'de-DE', 'title' => 'Kurs 2', 'alias' => 'kurs-2', 'visibility' => 'Public', 'type' => 'Default']);
+        $connection->insert('aliases', ['alias' => 'kurs', 'pageId' => 4, 'itemId' => 4, 'itemModel' => 'Frootbox\\Persistence\\Repositories\\Pages', 'language' => 'de-DE', 'status' => 301, 'config' => '{"target":"kurs-2"}']);
+
+        $pages = new SiteReader($connection)->read()->pages;
+
+        self::assertSame('ueber-uns', $pages[2]->path, 'Not "ueber-uns-1" from pages.alias: "ueber-uns" still leads to the page.');
+        self::assertSame('', $pages[1]->path, 'Not "-2": the start page had no path.');
+        self::assertSame('kurs-2', $pages[4]->path, 'A number of its own stays when the address without it only redirects.');
+    }
+
     public function testOnlyRowsVisitorsSeeAreVisible(): void
     {
         $connection = OldSite::create();

@@ -117,6 +117,7 @@ final readonly class SiteReader
 
         $pages = [];
         $languages = [];
+        $aliases = $this->aliases();
 
         foreach ($this->rows('SELECT * FROM pages ORDER BY lft, id') as $row) {
             $page = new Page(
@@ -125,7 +126,7 @@ final readonly class SiteReader
                 Row::int($row, 'lft'),
                 Row::string($row, 'language'),
                 Row::string($row, 'title'),
-                trim(Row::string($row, 'alias'), '/'),
+                self::livePath(trim(Row::string($row, 'alias'), '/'), Row::int($row, 'id'), Row::string($row, 'language'), $aliases),
                 Row::string($row, 'type'),
                 Row::string($row, 'visibility'),
                 Row::json($row, 'config'),
@@ -189,7 +190,7 @@ final readonly class SiteReader
             $widgets[$id] = new Widget($id, Row::string($row, 'className'), Row::json($row, 'config'), $content('Widgets:' . $id));
         }
 
-        return new Site($pages, $this->navigations(), $this->aliases(), $items, $files, array_map(strval(...), array_keys($languages)), $widgets);
+        return new Site($pages, $this->navigations(), $aliases, $items, $files, array_map(strval(...), array_keys($languages)), $widgets);
     }
 
     /**
@@ -244,6 +245,31 @@ final readonly class SiteReader
         }
 
         return $aliases;
+    }
+
+    /**
+     * The address a page has live in Frootbox 1. Since 2026-11 Frootbox 1
+     * keeps an address without a UID reserved, also against its own page:
+     * saving the page then writes "impressum-1" to pages.alias although
+     * "impressum" still leads to it with status 200 (start page: "" and
+     * "-1"). The router of Frootbox 1 serves both; the older one without
+     * the counter is the address the website had (decision 0356).
+     *
+     * @param list<Alias> $aliases
+     */
+    private static function livePath(string $path, int $page, string $language, array $aliases): string
+    {
+        if (1 !== preg_match('/^(.*)-\d+$/', $path, $match)) {
+            return $path;
+        }
+
+        foreach ($aliases as $alias) {
+            if ('Pages' === $alias->owner && $page === $alias->itemId && $language === $alias->language && 200 === $alias->status && $match[1] === $alias->path) {
+                return $alias->path;
+            }
+        }
+
+        return $path;
     }
 
     /**

@@ -1362,7 +1362,8 @@ final class Importer
     }
 
     /**
-     * A 301 for every old address that has no page of the same path.
+     * A 301 for every old address that is not the path of a page of the
+     * new website: a redirect there would shadow the page (decision 0356).
      *
      * @param list<Page> $pages
      *
@@ -1371,10 +1372,13 @@ final class Importer
     private function redirects(array $pages): array
     {
         $own = [];
+        $paths = [];
 
+        // Parents come first (by lft), so their new path is known.
         foreach ($pages as $page) {
             if (isset($this->created[$page->id])) {
-                $own[$page->path] = true;
+                $paths[$page->id] = $page->isRoot() ? '' : ltrim(($paths[$page->parentId] ?? '') . '/' . $page->slug(), '/');
+                $own[$paths[$page->id]] = true;
             }
         }
 
