@@ -15,6 +15,7 @@ use Frootbox\Core\Page\Reach;
 use Frootbox\MigrateFrootbox1\Mapping\Mapping;
 use Frootbox\MigrateFrootbox1\Mapping\Rule;
 use Frootbox\MigrateFrootbox1\Mapping\Target;
+use Frootbox\MigrateFrootbox1\Source\Block;
 use Frootbox\MigrateFrootbox1\Source\Content;
 use Frootbox\MigrateFrootbox1\Source\Element;
 use Frootbox\MigrateFrootbox1\Source\File;
@@ -352,9 +353,12 @@ final class Importer
     private function content(Page $page, string $area): array
     {
         $areas = [];
+        // The plugins in the columns of a grid go into the block of the grid, not on top.
+        $cells = self::cells($page->elements);
+        $loose = array_filter($page->elements, static fn(Element $element): bool => null === self::cell($element, $cells));
 
-        $first = array_filter($page->elements, static fn(Element $element): bool => 'MainContent' !== $element->socket);
-        $main = array_filter($page->elements, static fn(Element $element): bool => 'MainContent' === $element->socket);
+        $first = array_filter($loose, static fn(Element $element): bool => 'MainContent' !== $element->socket);
+        $main = array_filter($loose, static fn(Element $element): bool => 'MainContent' === $element->socket);
         $above = $page->blocksIn('block-content');
         $below = array_filter($page->blocks, static fn($block): bool => 'block-content' !== $block->area);
         $blocks = [];
@@ -378,8 +382,30 @@ final class Importer
             }
         }
 
-        foreach ([...$first, ...$above, ...$main, ...$below] as $part) {
+        return $areas + [$area => [...$blocks, ...$this->parts($page, [...$first, ...$above, ...$main, ...$below], $cells)]];
+    }
+
+    /**
+     * The blocks of plugins and blocks of Frootbox 1, in this order.
+     *
+     * @param list<Element|Block>                  $parts
+     * @param array<int, array<int, list<Element>>> $cells the plugins in the columns of each grid, by its ID
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function parts(Page $page, array $parts, array $cells): array
+    {
+        $blocks = [];
+
+        foreach ($parts as $part) {
             $isElement = $part instanceof Element;
+
+            if ($isElement && isset($cells[$part->id])) {
+                array_push($blocks, ...$this->grid($page, $part, $cells));
+
+                continue;
+            }
+
             $key = $isElement ? $part->plugin() . '@' . $part->layout() : $part->type;
             $this->where = \sprintf('%s %d (%s) on page %d "%s"', $isElement ? 'Plugin' : 'Block', $part->id, $key, $page->id, $page->title);
 
@@ -437,7 +463,100 @@ final class Importer
             }
         }
 
-        return $areas + [$area => $blocks];
+        return $blocks;
+    }
+
+    /**
+     * A grid of Frootbox 1 (columns such as "6-6"): with "areas" in its rule
+     * one block, each column in its area; else the columns one after
+     * another where the grid was.
+     *
+     * @param array<int, array<int, list<Element>>> $cells
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function grid(Page $page, Element $grid, array $cells): array
+    {
+        $where = \sprintf('Grid %d on page %d "%s"', $grid->id, $page->id, $page->title);
+
+        if (!$grid->visible) {
+            $this->note($where . ' is hidden and left out with its columns.');
+
+            return [];
+        }
+
+        $columns = $cells[$grid->id];
+        ksort($columns);
+        $inner = array_map(fn(array $elements): array => $this->parts($page, $elements, $cells), $columns);
+        $rules = $this->mapping->plugins;
+        $key = \array_key_exists((string) $grid->id, $rules) ? (string) $grid->id : $grid->plugin() . '@' . $grid->layout();
+        $rule = $rules[$key] ?? null;
+        $this->where = $where;
+        $block = null === $rule || [] === $rule->areas ? null : $this->block($rule, $grid->content, $grid->config, $grid);
+
+        if (null === $block) {
+            if (!\array_key_exists($key, $rules)) {
+                $this->note($where . ': the mapping does not name it, its columns follow one after another.');
+            }
+
+            return array_merge(...array_values($inner));
+        }
+
+        $after = [];
+        $areas = [];
+
+        foreach ($inner as $column => $blocks) {
+            $name = $rule->areas[$column] ?? null;
+
+            if (null === $name) {
+                $this->note(\sprintf('%s: column %d has no area in the mapping, its blocks follow the grid.', $where, $column + 1));
+                array_push($after, ...$blocks);
+
+                continue;
+            }
+
+            $areas[$name] = $blocks;
+        }
+
+        $block['areas'] = $areas;
+
+        return [$block, ...$after];
+    }
+
+    /**
+     * The plugins in the columns of the grids of a page, by the ID of the
+     * grid and the column: Frootbox 1 names their socket after both, e.g.
+     * MainContent_2_0 for the first column of grid 2.
+     *
+     * @param list<Element> $elements
+     *
+     * @return array<int, array<int, list<Element>>>
+     */
+    private static function cells(array $elements): array
+    {
+        $grids = [];
+
+        foreach ($elements as $element) {
+            if (str_ends_with($element->className, '\\Content\\Elements\\Grid')) {
+                $grids[$element->id] = [];
+            }
+        }
+
+        foreach ($elements as $element) {
+            if (1 === preg_match('/_(\d+)_(\d+)$/', $element->socket, $match) && isset($grids[(int) $match[1]])) {
+                $grids[(int) $match[1]][(int) $match[2]][] = $element;
+            }
+        }
+
+        return array_filter($grids, static fn(array $columns): bool => [] !== $columns);
+    }
+
+    /**
+     * @param array<int, array<int, list<Element>>> $cells
+     */
+    private static function cell(Element $element, array $cells): ?int
+    {
+        return 1 === preg_match('/_(\d+)_(\d+)$/', $element->socket, $match) && isset($cells[(int) $match[1]]) ? (int) $match[1] : null;
     }
 
     /**
@@ -504,6 +623,15 @@ final class Importer
         $this->element = null;
         $widget = array_values($this->widgets($rule, $content))[0] ?? null;
         $options = $this->placeholders($rule->options, $config, $widget->config ?? []);
+
+        // A number from Frootbox 1 stays a number only for an option of numbers, e.g. not the ID of a course to choose.
+        foreach ($options as $name => $value) {
+            $option = [] === $component->variants ? null : ($component->variant($rule->variant)->options[$name] ?? null);
+
+            if ((\is_int($value) || \is_float($value)) && null !== $option && 'number' !== $option->type) {
+                $options[$name] = (string) $value;
+            }
+        }
 
         foreach ($rule->needs as $name) {
             if (null === ($fields[$name] ?? null) || [] === $fields[$name] || '' === $fields[$name]) {
@@ -934,6 +1062,11 @@ final class Importer
      */
     private function link(string $href): string
     {
+        // The base template of Pixel-Fabrik hid e-mail addresses from spam bots behind a link that a script turned back.
+        if (1 === preg_match('#/SaveMailEscape/send/([^/?\#]+)#', $href, $match)) {
+            return 'mailto:' . self::unescapeMail(rawurldecode($match[1]));
+        }
+
         if ('' === $href || str_starts_with($href, '#') || 1 === preg_match('#^(mailto|tel):#i', $href)) {
             return $href;
         }
@@ -962,6 +1095,23 @@ final class Importer
         $fragment = \is_array($parts) && isset($parts['fragment']) ? '#' . $parts['fragment'] : '';
 
         return '' === $fragment ? 'page:' . $this->ref($page) : $href;
+    }
+
+    /**
+     * The address behind a link of the mail escape of Pixel-Fabrik: each
+     * character 33 places further in its own alphabet of 66.
+     */
+    private static function unescapeMail(string $escaped): string
+    {
+        $alphabet = 'C7olD9ALhcnQZtR1G4rq.pU2xjVBKvOIfEyMbY-mauw_HNWTiX3Sg@856zPkJds0Fe';
+        $address = '';
+
+        foreach (str_split($escaped) as $char) {
+            $position = strpos($alphabet, $char);
+            $address .= false === $position ? $char : $alphabet[($position + 33) % 66];
+        }
+
+        return $address;
     }
 
     private function unknown(string $href): string

@@ -62,6 +62,10 @@ plugins:
     block: acme/rental/Calendar
     options: { unit: '{config.unitId}' }
     then: [{ block: acme/rental/Prices, options: { unit: '{config.unitId}' } }]
+  Frootbox\Persistence\Content\Elements\Grid@Index01:   # a grid of columns, e.g. "6-6"
+    block: frootbox/theme-base/Section
+    variant: Two
+    areas: [first, second]          # the area of the block for each column, in order
 items:
   Teaser: { fields: { title: title, text: text, link: { to: link, text: More } } }
   Contact: { fields: { title: name, position: role, phone: phone, email: email, image: image } }
@@ -111,7 +115,9 @@ without a heading of its own gets its title, as Frootbox 1 showed it.
 `teaser-text`, e.g. for a sub navigation. `then` lists further rules for
 the same block or plugin, each a block right after the first, with the
 same texts and configuration, e.g. a calendar and the prices of a holiday
-apartment from one plugin of Frootbox 1. A widget in the text fills a
+apartment from one plugin of Frootbox 1. The plugins in the columns of a
+grid go into the areas its rule names under `areas`, one per column in
+order; without them they follow one after another where the grid was. A widget in the text fills a
 list with all its files with `widgets: { Core/Images/Gallery:
 images.#.image }`. Each value is converted by the type
 of the target field: HTML becomes rich text, links to old pages and

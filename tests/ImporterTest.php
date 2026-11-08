@@ -8,9 +8,12 @@ declare(strict_types=1);
 
 namespace Frootbox\MigrateFrootbox1\Tests;
 
+use Frootbox\Core\Component\Area;
 use Frootbox\Core\Component\Component;
 use Frootbox\Core\Component\ComponentKind;
 use Frootbox\Core\Component\Components;
+use Frootbox\Core\Component\Option;
+use Frootbox\Core\Component\Variant;
 use Frootbox\Core\Field\Field;
 use Frootbox\MigrateFrootbox1\Import\Importer;
 use Frootbox\MigrateFrootbox1\Import\Plan;
@@ -274,10 +277,10 @@ final class ImporterTest extends TestCase
 
     public function testAnOptionTakesAValueOfTheImageInTheText(): void
     {
-        $plan = $this->plan(textOptions: ['image' => ['value' => '{widget.align}', 'map' => ['right' => 'aside', 'justify' => 'below']], 'imageWidth' => '{widget.width}']);
+        $plan = $this->plan(textOptions: ['image' => ['value' => '{widget.align}', 'map' => ['right' => 'aside', 'justify' => 'below']], 'imageWidth' => '{widget.width}', 'columns' => '{widget.width}']);
         $text = self::main($plan->steps[4])[1] ?? null;
 
-        self::assertSame(['image' => 'aside', 'imageWidth' => 6], self::at($text, 'options'), 'The widget sits on the right with 6 of 12 columns.');
+        self::assertSame(['image' => 'aside', 'imageWidth' => 6, 'columns' => '6'], self::at($text, 'options'), 'The widget sits on the right with 6 of 12 columns; a number stays one only for an option of numbers.');
     }
 
     public function testTheIdOfABlockGoesBeforeItsType(): void
@@ -371,6 +374,36 @@ final class ImporterTest extends TestCase
         self::assertSame([], array_filter($plan->report, static fn(string $note): bool => str_contains($note, 'of the page is left out')), 'The fields of a page go to the list.');
     }
 
+    public function testTheColumnsOfAGridGoIntoTheAreasOfItsBlock(): void
+    {
+        $plan = $this->plan(grid: true, plugins: ['Frootbox\\Persistence\\Content\\Elements\\Grid@Index01' => ['block' => 'acme/site/Columns', 'areas' => ['first', 'second']]]);
+        $start = self::main(array_values(array_filter($plan->steps, static fn(array $step): bool => '${p1.id}' === self::at($step, 'page.update', 'id')))[0]);
+        $grid = array_values(array_filter($start, static fn(mixed $block): bool => 'acme/site/Columns' === self::at($block, 'block')));
+
+        self::assertCount(1, $grid);
+        self::assertSame(['Links'], array_map(static fn(mixed $block): mixed => self::at($block, 'fields', 'title'), (array) self::at($grid[0], 'areas', 'first')));
+        self::assertSame(['Rechts'], array_map(static fn(mixed $block): mixed => self::at($block, 'fields', 'title'), (array) self::at($grid[0], 'areas', 'second')));
+        self::assertSame(['acme/site/Columns', 'Unten'], array_values(array_filter(array_map(static fn(mixed $block): mixed => 'acme/site/Text' === self::at($block, 'block') ? self::at($block, 'fields', 'title') : self::at($block, 'block'), $start), static fn(mixed $name): bool => 'acme/site/Columns' === $name || 'Unten' === $name)), 'The grid stays at its place above the text below it.');
+    }
+
+    public function testWithoutAnAreaTheColumnsOfAGridFollowWhereItWas(): void
+    {
+        $plan = $this->plan(grid: true);
+        $start = self::main(array_values(array_filter($plan->steps, static fn(array $step): bool => '${p1.id}' === self::at($step, 'page.update', 'id')))[0]);
+        $titles = array_values(array_filter(array_map(static fn(mixed $block): mixed => self::at($block, 'fields', 'title'), $start), static fn(mixed $title): bool => \in_array($title, ['Links', 'Rechts', 'Unten'], true)));
+
+        self::assertSame(['Links', 'Rechts', 'Unten'], $titles);
+        self::assertNotEmpty(array_filter($plan->report, static fn(string $note): bool => str_contains($note, 'Grid 30') && str_contains($note, 'columns follow')));
+    }
+
+    public function testAnAddressBehindTheMailEscapeOfPixelFabrikBecomesAnEmailLink(): void
+    {
+        $plan = $this->plan(grid: true, plugins: ['Core/Editing/Text@Index01' => ['block' => 'acme/site/Text', 'fields' => ['title' => 'title', 'text' => 'columns.1.body']]]);
+
+        self::assertStringContainsString('"href":"mailto:info@example.test"', (string) json_encode($plan->steps, \JSON_UNESCAPED_SLASHES));
+        self::assertEmpty(array_filter($plan->report, static fn(string $note): bool => str_contains($note, 'SaveMailEscape')));
+    }
+
     public function testRejectsAMappingThatIsNotFilledIn(): void
     {
         $this->expectException(MappingException::class);
@@ -420,14 +453,18 @@ final class ImporterTest extends TestCase
      * @param array<int|string, mixed>            $plugins     More rules for plugins
      * @param array<string, mixed>                $items       More rules for objects
      * @param bool                                $tree        With an inherited slider, a sub navigation and a gallery widget
+     * @param bool                                $grid        With a grid of two columns on the start page
      */
-    private function plan(bool $publish = false, array $media = [], ?array $page = null, array $pages = [], bool $persons = false, bool $gallery = false, array $textOptions = [], ?array $teaser = null, bool $pluginPlace = true, ?array $content = null, array $menus = [], array $widgets = ['Core/Images/Thumbnail' => 'image'], array $blocks = [], array $plugins = [], array $items = [], bool $tree = false): Plan
+    private function plan(bool $publish = false, array $media = [], ?array $page = null, array $pages = [], bool $persons = false, bool $gallery = false, array $textOptions = [], ?array $teaser = null, bool $pluginPlace = true, ?array $content = null, array $menus = [], array $widgets = ['Core/Images/Thumbnail' => 'image'], array $blocks = [], array $plugins = [], array $items = [], bool $tree = false, bool $grid = false): Plan
     {
         $text = self::block('acme/site/Text', [
             'title' => new Field('title', 'headline', 'Title', optional: true),
             'columns' => new Field('columns', 'list', 'Columns', fields: ['body' => new Field('body', 'richtext', 'Text')]),
             'image' => new Field('image', 'image', 'Image', optional: true),
             'gallery' => new Field('gallery', 'list', 'Gallery', optional: true, fields: ['image' => new Field('image', 'image', 'Image')]),
+        ], [
+            new Option('imageWidth', 'number', 'Width of the image', 4),
+            new Option('columns', 'choice', 'Columns', '1', choices: ['1' => 'One', '6' => 'Six']),
         ]);
         $topics = self::block('acme/site/Topics', [
             'title' => new Field('title', 'headline', 'Title', optional: true),
@@ -438,9 +475,10 @@ final class ImporterTest extends TestCase
         ]);
         $banner = self::block('acme/site/Banner', ['image' => new Field('image', 'image', 'Image', optional: true)]);
         $view = new Component(ComponentKind::Block, 'acme/site/TopicView', '/tmp', 'Topics', '', ['title' => new Field('title', 'headline', 'Title', optional: true)], [], [], plugin: true);
+        $columns = new Component(ComponentKind::Block, 'acme/site/Columns', '/tmp', 'Columns', '', [], ['first' => new Area('first', 'First'), 'second' => new Area('second', 'Second')], []);
         $images = self::block('acme/site/Gallery', ['items' => new Field('items', 'list', 'Images', fields: ['image' => new Field('image', 'image', 'Image')])]);
         $components = new Components(
-            blocks: ['acme/site/Text' => $text, 'acme/site/Topics' => $topics, 'acme/site/Banner' => $banner, 'acme/site/Gallery' => $images, 'acme/site/TopicView' => $view],
+            blocks: ['acme/site/Text' => $text, 'acme/site/Topics' => $topics, 'acme/site/Banner' => $banner, 'acme/site/Gallery' => $images, 'acme/site/TopicView' => $view, 'acme/site/Columns' => $columns],
             layouts: ['acme/site/Page' => new Component(ComponentKind::Layout, 'acme/site/Page', '/tmp', 'Page', '', [], [], [], plugin: $pluginPlace)],
         );
         $mapping = Mapping::fromArray([
@@ -453,7 +491,7 @@ final class ImporterTest extends TestCase
                 'Teaser1' => ['block' => 'acme/site/Topics', 'fields' => ['title' => 'title', 'teasers' => 'items']],
                 'Gallery' => $gallery ? ['block' => 'acme/site/Gallery', 'fields' => ['images' => 'items.#.image']] : false,
             ],
-            'plugins' => $plugins + ['Core/Navigation/Teaser@Index06' => $teaser ?? ($persons ? ['block' => 'acme/site/Topics', 'fields' => ['persons' => 'items', 'items' => false]] : false)],
+            'plugins' => $plugins + ($grid ? ['Core/Editing/Text@Index01' => ['block' => 'acme/site/Text', 'fields' => ['title' => 'title']]] : []) + ['Core/Navigation/Teaser@Index06' => $teaser ?? ($persons ? ['block' => 'acme/site/Topics', 'fields' => ['persons' => 'items', 'items' => false]] : false)],
             'items' => $items + [
                 'Teaser' => ['fields' => ['title' => 'title', 'link' => ['to' => 'link', 'text' => 'Mehr'], 'background' => false]],
                 'Contact' => ['fields' => ['position' => 'title', 'image' => false]],
@@ -476,14 +514,24 @@ final class ImporterTest extends TestCase
             OldSite::tree($old);
         }
 
+        if ($grid) {
+            OldSite::grid($old);
+        }
+
         return new Importer(new SiteReader($old)->read(), $mapping, $components, $this->files)->plan($publish);
     }
 
     /**
      * @param array<string, Field> $fields
      */
-    private static function block(string $name, array $fields): Component
+    /**
+     * @param array<string, Field> $fields
+     * @param list<Option>         $options With options a variant Default that has them
+     */
+    private static function block(string $name, array $fields, array $options = []): Component
     {
-        return new Component(ComponentKind::Block, $name, '/tmp', $name, '', $fields, [], []);
+        $variants = [] === $options ? [] : [Variant::DEFAULT => new Variant(Variant::DEFAULT, $name, '', array_column(array_map(static fn(Option $option): array => [$option->name, $option], $options), 1, 0), '/tmp/Default.twig', $name)];
+
+        return new Component(ComponentKind::Block, $name, '/tmp', $name, '', $fields, [], $variants);
     }
 }

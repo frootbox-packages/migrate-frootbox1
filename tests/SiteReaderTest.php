@@ -43,4 +43,17 @@ final class SiteReaderTest extends TestCase
 
         self::assertSame(['Start', 'Kontakt', 'Über uns', 'Versteckt'], $titles, 'Highest orderId first, without one last.');
     }
+
+    public function testOnlyRowsVisitorsSeeAreVisible(): void
+    {
+        $connection = OldSite::create();
+        $link = 'Frootbox\\Ext\\Core\\HelpAndSupport\\Plugins\\Links\\Persistence\\Link';
+        $connection->insert('assets', ['id' => 10, 'pageId' => 1, 'pluginId' => 1, 'orderId' => 2, 'className' => $link, 'title' => 'Öffentlich', 'visibility' => 2]);
+        $connection->insert('assets', ['id' => 11, 'pageId' => 1, 'pluginId' => 1, 'orderId' => 1, 'className' => $link, 'title' => 'Nur Redaktion', 'visibility' => 1]);
+
+        $items = new SiteReader($connection)->read()->items;
+
+        self::assertTrue($items[10]->visible);
+        self::assertFalse($items[11]->visible, 'Frootbox 1 shows visibility 1 only to editors who are signed in.');
+    }
 }

@@ -26,6 +26,12 @@ final readonly class SiteReader
     /** Columns of a contact person that the mapping can name like texts. */
     private const array PERSON = ['gender', 'title', 'firstName', 'lastName', 'position', 'company', 'phone', 'phone2', 'fax', 'email', 'street', 'streetNumber', 'zipcode', 'city', 'facebook', 'instagram', 'xing', 'linkedin', 'twitter', 'youtube', 'twitch'];
 
+    /**
+     * Frootbox 1 shows a row to visitors from visibility 2 on; 1 is only
+     * for editors who are signed in, 0 hidden.
+     */
+    private const int PUBLIC = 2;
+
     public function __construct(private Connection $connection) {}
 
     public function read(): Site
@@ -82,7 +88,7 @@ final readonly class SiteReader
                 Row::string($row, 'title'),
                 Row::int($row, 'parentId'),
                 Row::int($row, 'orderId'),
-                Row::int($row, 'visibility') > 0,
+                self::shown($row),
                 Row::json($row, 'config'),
                 $content('asset:' . $id),
             );
@@ -103,7 +109,7 @@ final readonly class SiteReader
                 trim(Row::string($row, 'firstName') . ' ' . Row::string($row, 'lastName')),
                 0,
                 Row::int($row, 'orderId'),
-                Row::int($row, 'visibility') > 0,
+                self::shown($row),
                 array_filter(array_intersect_key($row, array_flip(self::PERSON)), static fn(mixed $value): bool => \is_string($value) && '' !== $value) + Row::json($row, 'config'),
                 $content('Contacts:' . Row::int($row, 'id')),
             );
@@ -146,7 +152,7 @@ final readonly class SiteReader
                 Row::string($row, 'blockId'),
                 Row::string($row, 'className'),
                 Row::nullableInt($row, 'orderId'),
-                Row::int($row, 'visibility') > 0,
+                self::shown($row),
                 Row::json($row, 'config'),
                 $content('Blocks:' . $id),
             );
@@ -167,7 +173,7 @@ final readonly class SiteReader
                 Row::string($row, 'className'),
                 Row::string($row, 'title'),
                 Row::int($row, 'orderId'),
-                Row::int($row, 'visibility') > 0,
+                self::shown($row),
                 Row::json($row, 'config'),
                 $content('ContentElements:' . $id),
                 'Inherited' === Row::string($row, 'inheritance'),
@@ -201,7 +207,7 @@ final readonly class SiteReader
                 Row::string($row, 'title'),
                 Row::string($row, 'className'),
                 Row::json($row, 'config'),
-                Row::int($row, 'visibility') > 0,
+                self::shown($row),
             );
         }
 
@@ -309,5 +315,13 @@ final readonly class SiteReader
                 $page->elements = $elements;
             }
         }
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    private static function shown(array $row): bool
+    {
+        return Row::int($row, 'visibility') >= self::PUBLIC;
     }
 }

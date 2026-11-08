@@ -24,6 +24,7 @@ final readonly class Rule
      * @param string|null                 $plugin  The page shows this plugin of Frootbox 2 in its default space, e.g. "frootbox/shop/product"; "block" may then be left out
      * @param list<string>                $needs   Fields of the block that must get a value, else the block is left out, e.g. the images of a slider
      * @param list<Rule>                  $then    Further blocks from the same block or plugin, right after it, e.g. the prices beside the calendar of a holiday apartment
+     * @param list<string>                $areas   For a grid of Frootbox 1: the area of the block for each of its columns, in order
      */
     public function __construct(
         public string $block,
@@ -36,6 +37,7 @@ final readonly class Rule
         public ?string $plugin = null,
         public array $needs = [],
         public array $then = [],
+        public array $areas = [],
     ) {}
 
     /**

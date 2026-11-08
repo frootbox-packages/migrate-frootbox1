@@ -307,6 +307,12 @@ final readonly class Mapping
             }
         }
 
+        $areas = [];
+
+        foreach (Row::map($rule['areas'] ?? []) as $number => $name) {
+            $areas[] = self::name($name, $where . '.areas.' . $number);
+        }
+
         return new Rule(
             null !== $plugin && !\array_key_exists('block', $rule) ? '' : self::name($rule['block'] ?? null, $where . '.block'),
             \is_string($rule['variant'] ?? null) ? $rule['variant'] : null,
@@ -318,6 +324,7 @@ final readonly class Mapping
             $plugin,
             $needs,
             $then,
+            $areas,
         );
     }
 

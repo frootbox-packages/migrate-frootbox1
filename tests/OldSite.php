@@ -90,8 +90,8 @@ final class OldSite
      */
     public static function tree(Connection $connection): void
     {
-        $connection->insert('content_elements', ['id' => 2, 'pageId' => 1, 'socket' => 'Emotional', 'orderId' => 1, 'className' => 'Frootbox\Ext\Core\Images\Plugins\Slider\Plugin', 'title' => 'Bilder', 'visibility' => 1, 'inheritance' => 'Inherited']);
-        $connection->insert('content_elements', ['id' => 3, 'pageId' => 1, 'socket' => 'MainContent', 'orderId' => 1, 'className' => 'Frootbox\Ext\Core\Navigation\Plugins\SubNavigation\Plugin', 'title' => 'Unsere Seiten', 'visibility' => 1, 'inheritance' => 'None']);
+        $connection->insert('content_elements', ['id' => 2, 'pageId' => 1, 'socket' => 'Emotional', 'orderId' => 1, 'className' => 'Frootbox\Ext\Core\Images\Plugins\Slider\Plugin', 'title' => 'Bilder', 'visibility' => 2, 'inheritance' => 'Inherited']);
+        $connection->insert('content_elements', ['id' => 3, 'pageId' => 1, 'socket' => 'MainContent', 'orderId' => 1, 'className' => 'Frootbox\Ext\Core\Navigation\Plugins\SubNavigation\Plugin', 'title' => 'Unsere Seiten', 'visibility' => 2, 'inheritance' => 'None']);
         $elements = 'Frootbox-Persistence-Repositories-ContentElements';
         $connection->insert('files', ['id' => 20, 'orderId' => 1, 'name' => 'hinten.jpg', 'type' => 'image/jpeg', 'size' => 10, 'path' => 'uploads/kopf.jpg', 'uid' => $elements . ':2:files-2']);
         $connection->insert('files', ['id' => 21, 'orderId' => 2, 'name' => 'vorne.jpg', 'type' => 'image/jpeg', 'size' => 10, 'path' => 'uploads/team.jpg', 'uid' => $elements . ':2:files-2']);
@@ -102,6 +102,22 @@ final class OldSite
         $pages = 'Frootbox-Persistence-Repositories-Pages';
         $connection->insert('files', ['id' => 24, 'name' => 'seite.jpg', 'type' => 'image/jpeg', 'size' => 10, 'path' => 'uploads/kopf.jpg', 'uid' => $pages . ':2:image']);
         $connection->insert('content_texts', ['uid' => $pages . ':2:teaser-text', 'text' => '<p>Wer wir sind</p>', 'language' => 'de-DE']);
+    }
+
+    /**
+     * A grid "6-6" on the start page between two texts of its own: a text
+     * in each column (sockets MainContent_30_0 and MainContent_30_1) and a
+     * text below the grid.
+     */
+    public static function grid(Connection $connection): void
+    {
+        $text = 'Frootbox\\Ext\\Core\\Editing\\Plugins\\Text\\Plugin';
+        $connection->insert('content_elements', ['id' => 30, 'pageId' => 1, 'socket' => 'MainContent', 'orderId' => 5, 'className' => 'Frootbox\\Persistence\\Content\\Elements\\Grid', 'config' => '{"columns":"6-6"}', 'visibility' => 2, 'inheritance' => 'None']);
+        $connection->insert('content_elements', ['id' => 31, 'pageId' => 1, 'socket' => 'MainContent_30_0', 'orderId' => 1, 'className' => $text, 'title' => 'Links', 'visibility' => 2, 'inheritance' => 'None']);
+        $connection->insert('content_elements', ['id' => 32, 'pageId' => 1, 'socket' => 'MainContent_30_1', 'orderId' => 1, 'className' => $text, 'title' => 'Rechts', 'visibility' => 2, 'inheritance' => 'None']);
+        $connection->insert('content_elements', ['id' => 33, 'pageId' => 1, 'socket' => 'MainContent', 'orderId' => 1, 'className' => $text, 'title' => 'Unten', 'visibility' => 2, 'inheritance' => 'None']);
+        // An address hidden by the mail escape of Pixel-Fabrik: info@example.test.
+        $connection->insert('content_texts', ['uid' => 'Frootbox-Persistence-Repositories-ContentElements:33:text', 'text' => '<p>Per <a data-xtg="1_eM.fzLA8bf@WfvW" href="/page/Ext/PixelFabrik/BaseTemplate/SaveMailEscape/send/1_eM.fzLA8bf@WfvW">E-Mail</a></p>', 'language' => 'de-DE']);
     }
 
     /**
