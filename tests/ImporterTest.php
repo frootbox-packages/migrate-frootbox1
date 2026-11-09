@@ -168,6 +168,26 @@ final class ImporterTest extends TestCase
         );
     }
 
+    public function testTakesOverThePasswordOfAPage(): void
+    {
+        $plan = $this->plan(security: ['password' => 'Kaffeebohne42', 'token' => '0123abcd']);
+        $protect = array_values(array_filter($plan->steps, static fn(array $step): bool => isset($step['page.protect'])));
+
+        self::assertSame([['page.protect' => ['id' => '${p2.id}', 'password' => 'Kaffeebohne42']]], $protect, 'For the page only, as Frootbox 1 checked it.');
+        self::assertContains('Page 2 "Über uns" is protected with its password from Frootbox 1, which the seed holds in plain text as Frootbox 1 did.', $plan->report);
+
+        foreach ([['password' => 'kurz'], ['internal' => 'on']] as $security) {
+            $plan = $this->plan(security: $security);
+            $protect = array_values(array_filter($plan->steps, static fn(array $step): bool => isset($step['page.protect'])));
+            $step = $protect[0]['page.protect'] ?? null;
+            self::assertIsArray($step);
+            $password = $step['password'] ?? null;
+            self::assertIsString($password);
+            self::assertSame(24, \strlen($password), 'A random password instead.');
+            self::assertCount(1, array_filter($plan->report, static fn(string $line): bool => str_contains($line, 'random password')));
+        }
+    }
+
     public function testReportsWhatStaysBehind(): void
     {
         $plan = $this->plan();
@@ -464,8 +484,9 @@ final class ImporterTest extends TestCase
      * @param array<string, mixed>                $items       More rules for objects
      * @param bool                                $tree        With an inherited slider, a sub navigation and a gallery widget
      * @param bool                                $grid        With a grid of two columns on the start page
+     * @param array<string, string>|null          $security    The security settings of page 2 in Frootbox 1
      */
-    private function plan(bool $publish = false, array $media = [], ?array $page = null, array $pages = [], bool $persons = false, bool $gallery = false, array $textOptions = [], ?array $teaser = null, bool $pluginPlace = true, ?array $content = null, array $menus = [], array $widgets = ['Core/Images/Thumbnail' => 'image'], array $blocks = [], array $plugins = [], array $items = [], bool $tree = false, bool $grid = false, bool $suffixed = false): Plan
+    private function plan(bool $publish = false, array $media = [], ?array $page = null, array $pages = [], bool $persons = false, bool $gallery = false, array $textOptions = [], ?array $teaser = null, bool $pluginPlace = true, ?array $content = null, array $menus = [], array $widgets = ['Core/Images/Thumbnail' => 'image'], array $blocks = [], array $plugins = [], array $items = [], bool $tree = false, bool $grid = false, bool $suffixed = false, ?array $security = null): Plan
     {
         $text = self::block('acme/site/Text', [
             'title' => new Field('title', 'headline', 'Title', optional: true),
@@ -530,6 +551,10 @@ final class ImporterTest extends TestCase
 
         if ($suffixed) {
             OldSite::suffixed($old);
+        }
+
+        if (null !== $security) {
+            $old->update('pages', ['config' => json_encode(['view' => null, 'security' => $security], \JSON_THROW_ON_ERROR)], ['id' => 2]);
         }
 
         return new Importer(new SiteReader($old)->read(), $mapping, $components, $this->files)->plan($publish);

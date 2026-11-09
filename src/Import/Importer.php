@@ -195,7 +195,7 @@ final class Importer
             }
         }
 
-        $steps = [...$this->media, ...$create, ...$this->forms, ...$content, ...$this->assignments(), ...$this->navigations(), ...$this->siteFields(), ...$this->redirects($pages)];
+        $steps = [...$this->media, ...$create, ...$this->forms, ...$content, ...$this->protections($pages), ...$this->assignments(), ...$this->navigations(), ...$this->siteFields(), ...$this->redirects($pages)];
 
         if ($publish) {
             $steps = [...$steps, ...$this->publish()];
@@ -1399,6 +1399,46 @@ final class Importer
             }
 
             $steps[] = ['redirect.create' => ['path' => '/' . $path, 'target' => 'page:' . $this->ref($page)]];
+        }
+
+        return $steps;
+    }
+
+    /**
+     * The password of a page (decision 0358 of the CMS). It applies right
+     * away, also without --publish. Frootbox 1 checked it for the page
+     * only, not for its subpages. A page only for signed-in users gets a
+     * random password, since Frootbox 2 has no accounts for visitors.
+     *
+     * @param list<Page> $pages
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function protections(array $pages): array
+    {
+        $steps = [];
+
+        foreach ($pages as $page) {
+            if (!isset($this->created[$page->id])) {
+                continue;
+            }
+
+            $password = $page->password();
+            $where = \sprintf('Page %d "%s"', $page->id, $page->title);
+
+            if ($page->onlySignedIn()) {
+                $password = bin2hex(random_bytes(12));
+                $this->note($where . ' was only for signed-in users. It is protected with a random password now; set one in the backend.');
+            } elseif ('' === $password) {
+                continue;
+            } elseif (mb_strlen($password) < 8) {
+                $password = bin2hex(random_bytes(12));
+                $this->note($where . ' had a password shorter than 8 characters. It is protected with a random password now; set a longer one in the backend.');
+            } else {
+                $this->note($where . ' is protected with its password from Frootbox 1, which the seed holds in plain text as Frootbox 1 did.');
+            }
+
+            $steps[] = ['page.protect' => ['id' => $this->ref($page->id), 'password' => $password]];
         }
 
         return $steps;

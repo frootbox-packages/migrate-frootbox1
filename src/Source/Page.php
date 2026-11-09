@@ -81,6 +81,23 @@ final class Page
         return self::isOn(Row::pathString($this->config, 'search', 'preventIndexing'));
     }
 
+    /**
+     * The password visitors had to enter, in plain text in Frootbox 1;
+     * '' for none.
+     */
+    public function password(): string
+    {
+        return Row::pathString($this->config, 'security', 'password');
+    }
+
+    /**
+     * Whether only signed-in users saw the page.
+     */
+    public function onlySignedIn(): bool
+    {
+        return self::isOn(Row::pathString($this->config, 'security', 'internal'));
+    }
+
     public function isRedirect(): bool
     {
         return 'Redirect' === $this->type || 'Redirect' === Row::pathString($this->config, 'pageType');
